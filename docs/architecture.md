@@ -1,0 +1,11 @@
+# Architecture
+- Clients (Next.js, Flutter) talk only to NestJS. Notion token lives only in `server/.env`. The web app calls a Next.js server-side proxy (`/api/proxy/*`) that attaches the API key, so no secret reaches the browser. Flutter stores the API key in the device keystore.
+- `NotionService` isolates the SDK (retry/backoff on 429/5xx, error translation, data-source vs legacy database support).
+- `entities/mapping.ts` converts any schema to a normalized record; unsupported property types are listed in `unsupported`, never written.
+- One generic `EntitiesService` serves tasks, projects, goals, learning.
+- Writes: validated DTO → check the page belongs to the configured DB → create/update → `SyncService.bump`.
+- **Duplicate protection**: `Idempotency-Key` header on POST (in-memory, 10 min).
+- **Conflict policy**: PATCH requires `expectedLastEdited`; if Notion's `last_edited_time` differs → HTTP 409 with the current record. Notion wins; nothing is silently overwritten. (Small race window between check and write exists; Notion has no conditional update.)
+- **Notion → app**: list calls read live; `GET /sync/status` version + 15s client polling; webhook (HMAC verified) bumps the version immediately. Not instantaneous without webhooks.
+- No database yet. Add PostgreSQL/TypeORM when you need offline sync, audit logs, persisted sync cursors, multi-instance deployment or AI history.
+- Deferred: OAuth multi-user, AI assistant, offline cache, full-text page-content search (Notion search matches titles only; list search filters on title).
