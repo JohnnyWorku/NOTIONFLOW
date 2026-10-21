@@ -1,7 +1,10 @@
 {
-  "name": "notionflow",
+  "name": "NOTIONFLOW",
   "private": true,
-  "workspaces": ["server", "apps/web"],
+  "workspaces": [
+    "server",
+    "apps/web"
+  ],
   "scripts": {
     "dev:server": "npm run start:dev -w server",
     "dev:web": "npm run dev -w web",
