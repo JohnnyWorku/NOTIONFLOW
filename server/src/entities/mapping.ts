@@ -1,19 +1,21 @@
 /** Maps arbitrary Notion schemas to NotionFlow's normalized record. Unsupported types are reported, never guessed. */
-export type Kind = 'tasks' | 'projects' | 'goals' | 'learning';
+/** A collection key: built-ins (tasks, projects, goals, learning) or any custom key from NOTION_COLLECTIONS. */
+export type Kind = string;
 export interface FieldMap {
   title?: string; status?: string; priority?: string; due?: string;
-  done?: string; relation?: string; progress?: string; notes?: string;
+  done?: string; relation?: string; progress?: string; notes?: string; amount?: string;
 }
 export interface NfRecord {
   id: string; url: string; title: string; status: string | null; priority: string | null;
-  due: string | null; done: boolean | null; progress: number | null; relatedIds: string[];
-  notes: string | null; lastEdited: string; unsupported: string[];
+  due: string | null; done: boolean | null; progress: number | null; amount: number | null; relatedIds: string[];
+  notes: string | null; created: string; lastEdited: string; unsupported: string[];
 }
 
 const HINTS: Record<keyof FieldMap, RegExp> = {
   title: /./, status: /status|state|stage/i, priority: /priority|importance/i,
   due: /due|deadline|date|target/i, done: /done|complete/i,
   relation: /project|task|goal|relation/i, progress: /progress|percent/i, notes: /note|description|summary/i,
+  amount: /count|amount|value|pages?|minutes|hours|score|streak|reps|total|verses|distance/i,
 };
 
 const SUPPORTED = new Set(['title', 'rich_text', 'status', 'select', 'date', 'checkbox', 'number', 'relation', 'url']);
@@ -35,6 +37,7 @@ export function detectFields(schema: Record<string, any>, override: FieldMap = {
     progress: entries.find(([n, p]) => p.type === 'number' && HINTS.progress.test(n))?.[0],
     notes: byType(['rich_text'], HINTS.notes),
   };
+  out.amount = entries.find(([n, p]) => p.type === 'number' && n !== out.progress && HINTS.amount.test(n))?.[0];
   for (const k of Object.keys(override) as (keyof FieldMap)[]) if (override[k]) out[k] = override[k];
   return out;
 }
@@ -58,8 +61,10 @@ export function pageToRecord(page: any, f: FieldMap): NfRecord {
     due: get(f.due)?.date?.start ?? null,
     done: get(f.done)?.checkbox ?? null,
     progress: get(f.progress)?.number ?? null,
+    amount: get(f.amount)?.number ?? null,
     relatedIds: (get(f.relation)?.relation ?? []).map((r: any) => r.id),
     notes: f.notes ? plain(get(f.notes)?.rich_text) || null : null,
+    created: page.created_time ?? page.last_edited_time,
     lastEdited: page.last_edited_time,
     unsupported,
   };
@@ -67,7 +72,7 @@ export function pageToRecord(page: any, f: FieldMap): NfRecord {
 
 export interface WriteInput {
   title?: string; status?: string; priority?: string; due?: string | null;
-  done?: boolean; progress?: number; notes?: string;
+  done?: boolean; progress?: number; amount?: number; notes?: string;
 }
 
 /** Build Notion property payload; throws when a requested field has no mapped property. */
@@ -94,6 +99,7 @@ export function buildProperties(f: FieldMap, schema: Record<string, any>, input:
   }
   if (input.done !== undefined) props[need('done', 'done checkbox').name] = { checkbox: input.done };
   if (input.progress !== undefined) props[need('progress', 'progress').name] = { number: input.progress };
+  if (input.amount !== undefined) props[need('amount', 'amount').name] = { number: input.amount };
   if (input.notes !== undefined) props[need('notes', 'notes').name] = { rich_text: [{ text: { content: input.notes } }] };
   return props;
 }

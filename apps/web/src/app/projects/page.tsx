@@ -1,10 +1,6 @@
 'use client';
-import { RecordList } from '@/components/records';
+import { CollectionView } from '@/components/collection-view';
+
 export default function Page() {
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Projects</h1>
-      <RecordList kind="projects" emptyText="No projects found." />
-    </div>
-  );
+  return <CollectionView ckey="projects" title="Projects" subtitle="Your projects and their status" />;
 }

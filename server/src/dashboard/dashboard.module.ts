@@ -37,9 +37,9 @@ class DashboardController {
       notion: { configured: this.notion.configured },
       sync: this.sync.status(),
       tasks: tasks && {
-        today: open.filter((t) => t.due?.slice(0, 10) === today),
-        overdue: open.filter((t) => t.due && t.due.slice(0, 10) < today),
-        upcoming: open.filter((t) => t.due && t.due.slice(0, 10) > today).slice(0, 10),
+        today: open.filter((t: NfRecord) => t.due?.slice(0, 10) === today),
+        overdue: open.filter((t: NfRecord) => t.due && t.due.slice(0, 10) < today),
+        upcoming: open.filter((t: NfRecord) => t.due && t.due.slice(0, 10) > today).slice(0, 10),
       },
       projects: projects && { active: projects.items.filter((p: NfRecord) => !/done|complete|archiv/i.test(p.status ?? '')) },
       goals: goals && { items: goals.items, averageProgress: avg(goals.items) },

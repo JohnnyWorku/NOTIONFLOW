@@ -1,0 +1,36 @@
+# Render Blueprint for the NestJS backend (optional: you can also create the service by hand in the dashboard).
+# Values marked sync:false are asked for in the dashboard and never stored in Git.
+services:
+  - type: web
+    name: notionflow-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build -w server
+    startCommand: npm run start -w server
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: NOTION_TOKEN
+        sync: false
+      - key: NOTION_TASKS_DB
+        sync: false
+      - key: NOTION_PROJECTS_DB
+        sync: false
+      - key: NOTION_GOALS_DB
+        sync: false
+      - key: NOTION_LEARNING_DB
+        sync: false
+      - key: NOTION_COLLECTIONS
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: WEB_ORIGIN
+        sync: false
+      - key: NOTION_WEBHOOK_SECRET
+        sync: false

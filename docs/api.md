@@ -1,8 +1,17 @@
-# API (Swagger at /api/docs). Auth: `Authorization: Bearer $APP_API_KEY`
-- `GET /api/health` (public)
+# API (Swagger at /api/docs in development)
+
+Auth: `POST /api/auth/login {password}` -> `{token, expiresAt}`; then `Authorization: Bearer <token>`.
+(An optional static `APP_API_KEY` is also accepted for scripts.) Public: `/api/health`, `/api/auth/login`, `/api/sync/webhook`.
+
+- `GET /api/collections` (labels/icons only, never database IDs)
+- `GET /api/c/:key/meta` field mapping + allowed Status/Priority options
+- `GET|POST /api/c/:key`, `GET|PATCH|DELETE /api/c/:key/:pageId` (DELETE archives to Notion trash)
+  - list query: `cursor, pageSize (<=100), search, status, overdue`
+  - POST header `Idempotency-Key`; PATCH requires `expectedLastEdited` (409 + current record when stale)
+  - body fields: `title status priority due done progress amount notes`
+- Legacy aliases: `/api/tasks`, `/api/projects`, `/api/goals`, `/api/learning` (same behaviour)
+- `GET /api/dashboard`
+- `GET /api/stats?days=7..365&tz=<minutes east of UTC>` performance statistics (cached 60s)
 - `GET /api/notion/databases`, `GET /api/notion/databases/:id/schema`
-- `GET|POST /api/{tasks|projects|goals|learning}`, `GET|PATCH|DELETE /api/{kind}/:pageId` (DELETE archives)
-  - list query: `cursor, pageSize, search, status, overdue`
-  - POST header: `Idempotency-Key`; PATCH body requires `expectedLastEdited` (409 on stale)
-- `GET /api/dashboard`, `GET /api/sync/status`, `GET /api/sync/changes?since=N`, `POST /api/sync/webhook` (public, HMAC)
+- `GET /api/sync/status`, `GET /api/sync/changes?since=N`, `POST /api/sync/webhook`
 Errors: `{ statusCode, code?, message }`.

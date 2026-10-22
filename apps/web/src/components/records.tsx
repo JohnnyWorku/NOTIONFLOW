@@ -1,40 +1,49 @@
 'use client';
-import { useQuery } from '@tanstack/react-query';
-import { ExternalLink } from 'lucide-react';
-import { useState } from 'react';
-import { api, Kind, NfRecord, Page } from '@/lib/api';
-import { Empty, ErrorBox, Loading } from './ui';
+import { Calendar, ExternalLink, Pencil, Search } from 'lucide-react';
+import type { NfRecord } from '@/lib/api';
+import { formatDue, priorityTone, statusTone } from '@/lib/format';
+import { Pill, ProgressBar } from './ui';
 
-export function RecordRow({ r, right }: { r: NfRecord; right?: React.ReactNode }) {
+export function RecordRow({ r, leading, dense, onEdit }: { r: NfRecord; leading?: React.ReactNode; dense?: boolean; onEdit?: () => void }) {
+  const done = r.done === true || (r.status ? /done|complete/i.test(r.status) : false);
+  const due = r.due ? formatDue(r.due, done) : null;
   return (
-    <li className="card flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <p className="truncate font-medium">{r.title}</p>
-        <p className="text-xs text-slate-500">
-          {[r.status, r.priority, r.due && `due ${r.due.slice(0, 10)}`, r.progress !== null && `${r.progress}%`].filter(Boolean).join(' · ')}
-        </p>
+    <li className={`flex items-start gap-3 rounded-xl border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm ${dense ? 'p-3' : 'p-4'}`}>
+      {leading}
+      <div className="min-w-0 flex-1">
+        <p className={`truncate font-medium ${done ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{r.title}</p>
+        {(r.status || r.priority || due || r.amount !== null) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {r.status && <Pill tone={statusTone(r.status)}>{r.status}</Pill>}
+            {r.priority && <Pill tone={priorityTone(r.priority)}>{r.priority}</Pill>}
+            {due && (
+              <Pill tone={due.overdue ? 'red' : due.today ? 'amber' : 'slate'}>
+                <Calendar size={12} /> {due.label}
+              </Pill>
+            )}
+            {r.amount !== null && <Pill tone="violet">{r.amount}</Pill>}
+          </div>
+        )}
+        {r.progress !== null && <ProgressBar value={r.progress} className="mt-2.5" />}
       </div>
-      <div className="flex items-center gap-2">
-        {right}
-        <a href={r.url} target="_blank" rel="noreferrer" aria-label={`Open ${r.title} in Notion`} className="text-slate-500 hover:text-slate-900"><ExternalLink size={16} /></a>
-      </div>
+      {onEdit && (
+        <button onClick={onEdit} aria-label={`Edit ${r.title}`} className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+          <Pencil size={16} />
+        </button>
+      )}
+      <a href={r.url} target="_blank" rel="noreferrer" aria-label={`Open ${r.title} in Notion`}
+        className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+        <ExternalLink size={16} />
+      </a>
     </li>
   );
 }
 
-/** Generic searchable, paginated list used by projects, goals and learning. */
-export function RecordList({ kind, emptyText }: { kind: Kind; emptyText: string }) {
-  const [search, setSearch] = useState('');
-  const q = useQuery({
-    queryKey: [kind, search],
-    queryFn: () => api<Page<NfRecord>>(`${kind}?pageSize=50${search ? `&search=${encodeURIComponent(search)}` : ''}`),
-  });
+export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
-    <div className="space-y-3">
-      <input className="input" placeholder="Search…" aria-label="Search" value={search} onChange={(e) => setSearch(e.target.value)} />
-      {q.isLoading ? <Loading /> : q.isError ? <ErrorBox error={q.error} retry={() => q.refetch()} /> :
-        q.data!.items.length === 0 ? <Empty text={emptyText} /> :
-        <ul className="space-y-2">{q.data!.items.map((r) => <RecordRow key={r.id} r={r} />)}</ul>}
+    <div className="relative max-w-sm flex-1">
+      <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input className="input pl-9" placeholder={placeholder} aria-label={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }

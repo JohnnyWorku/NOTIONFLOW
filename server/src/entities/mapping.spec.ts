@@ -43,3 +43,18 @@ describe('mapping', () => {
     expect(() => buildProperties({ title: 'Name' }, schema, { priority: 'High' })).toThrow(MappingError);
   });
 });
+
+describe('mapping: amount and created', () => {
+  const sch = { Name: { type: 'title' }, Pages: { type: 'number' }, Progress: { type: 'number' }, Date: { type: 'date' } };
+  it('detects amount separately from progress', () => {
+    const f = detectFields(sch);
+    expect(f.progress).toBe('Progress');
+    expect(f.amount).toBe('Pages');
+  });
+  it('reads and writes amount', () => {
+    const f = detectFields(sch);
+    const page = { id: 'p', url: 'u', created_time: 'c', last_edited_time: 'e', properties: { Name: { type: 'title', title: [] }, Pages: { type: 'number', number: 12 } } };
+    expect(pageToRecord(page, f)).toMatchObject({ amount: 12, created: 'c' });
+    expect(buildProperties(f, sch, { amount: 7 })).toEqual({ Pages: { number: 7 } });
+  });
+});

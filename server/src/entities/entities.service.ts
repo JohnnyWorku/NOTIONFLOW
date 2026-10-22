@@ -3,33 +3,48 @@ import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
 import { NotionService } from '../notion/notion.service';
 import { SyncService } from '../sync/sync.service';
+import { CollectionsService } from './collections.service';
 import { FieldMap, Kind, MappingError, NfRecord, buildProperties, detectFields, pageToRecord } from './mapping';
 import { CreateRecordDto, ListQueryDto, UpdateRecordDto } from './dto';
 
-const ENV: Record<Kind, string> = {
-  tasks: 'NOTION_TASKS_DB', projects: 'NOTION_PROJECTS_DB', goals: 'NOTION_GOALS_DB', learning: 'NOTION_LEARNING_DB',
-};
-
 @Injectable()
 export class EntitiesService {
-  private overrides: Partial<Record<Kind, FieldMap>> = {};
+  private fileOverrides: Record<string, FieldMap> = {};
   /** Idempotency-Key -> created record (in memory, 10 min). Prevents duplicate creates on retries. */
   private idem = new Map<string, { at: number; record: NfRecord }>();
 
-  constructor(private notion: NotionService, private cfg: ConfigService, private sync: SyncService) {
+  constructor(private notion: NotionService, cfg: ConfigService, private sync: SyncService, private collections: CollectionsService) {
     const path = cfg.get<string>('NOTION_MAPPING_PATH');
-    if (path) this.overrides = JSON.parse(readFileSync(path, 'utf8'));
+    if (path) this.fileOverrides = JSON.parse(readFileSync(path, 'utf8'));
   }
 
   private dbId(kind: Kind): string {
-    const id = this.cfg.get<string>(ENV[kind]);
-    if (!id) throw new ServiceUnavailableException({ code: 'DB_NOT_CONFIGURED', message: `${ENV[kind]} is not set.` });
-    return id;
+    const c = this.collections.get(kind);
+    if (!c) throw new NotFoundException({ code: 'UNKNOWN_COLLECTION', message: `Unknown collection "${kind}".` });
+    if (!c.databaseId) throw new ServiceUnavailableException({ code: 'DB_NOT_CONFIGURED', message: `"${c.label}" has no Notion database configured.` });
+    return c.databaseId;
   }
 
   private async ctx(kind: Kind) {
     const src = await this.notion.resolve(this.dbId(kind));
-    return { src, fields: detectFields(src.properties, this.overrides[kind]) };
+    const inline = this.collections.get(kind)?.fields;
+    return { src, fields: detectFields(src.properties, { ...this.fileOverrides[kind], ...inline }) };
+  }
+
+  /** Field mapping + allowed Status/Priority options, so clients can render real dropdowns. */
+  async meta(kind: Kind) {
+    const { src, fields } = await this.ctx(kind);
+    const options = (name?: string): string[] => {
+      const p = name ? src.properties[name] : undefined;
+      return ((p?.status?.options ?? p?.select?.options ?? []) as any[]).map((o) => o.name as string);
+    };
+    return {
+      key: kind,
+      label: this.collections.get(kind)?.label ?? kind,
+      title: src.title,
+      fields,
+      options: { status: options(fields.status), priority: options(fields.priority) },
+    };
   }
 
   async list(kind: Kind, q: ListQueryDto) {
@@ -46,15 +61,28 @@ export class EntitiesService {
     }
     const res = await this.notion.query(src, {
       filter: and.length ? { and } : undefined,
-      sorts: fields.due ? [{ property: fields.due, direction: 'ascending' }] : [{ timestamp: 'last_edited_time', direction: 'descending' }],
+      sorts: fields.due ? [{ property: fields.due, direction: fields.done ? 'ascending' : 'descending' }] : [{ timestamp: 'last_edited_time', direction: 'descending' }],
       start_cursor: q.cursor,
       page_size: q.pageSize ?? 25,
     });
     return {
-      items: res.results.map((p: any) => pageToRecord(p, fields)),
-      nextCursor: res.has_more ? res.next_cursor : null,
+      items: res.results.map((p: any) => pageToRecord(p, fields)) as NfRecord[],
+      nextCursor: (res.has_more ? res.next_cursor : null) as string | null,
       mapping: fields,
     };
+  }
+
+  /** Walks pages (up to `max` records) for statistics. */
+  async all(kind: Kind, max = 300): Promise<{ items: NfRecord[]; truncated: boolean }> {
+    const items: NfRecord[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await this.list(kind, { pageSize: 100, cursor });
+      items.push(...page.items);
+      if (!page.nextCursor) return { items, truncated: false };
+      if (items.length >= max) return { items: items.slice(0, max), truncated: true };
+      cursor = page.nextCursor;
+    }
   }
 
   async get(kind: Kind, pageId: string): Promise<NfRecord> {
@@ -64,7 +92,7 @@ export class EntitiesService {
     return pageToRecord(page, fields);
   }
 
-  /** Reject pages from databases not configured for this kind (prevents arbitrary page edits). */
+  /** Reject pages from databases not configured for this collection (prevents arbitrary page edits). */
   private assertBelongs(page: any, kind: Kind) {
     const configured = this.dbId(kind);
     const p = page.parent ?? {};
@@ -77,6 +105,15 @@ export class EntitiesService {
     return !!s && ids.includes(s.id);
   }
 
+  private build(fields: FieldMap, schema: Record<string, any>, input: Parameters<typeof buildProperties>[2]) {
+    try {
+      return buildProperties(fields, schema, input);
+    } catch (e) {
+      if (e instanceof MappingError) throw new UnprocessableEntityException({ code: 'MAPPING', message: e.message });
+      throw e;
+    }
+  }
+
   async create(kind: Kind, dto: CreateRecordDto, idemKey?: string): Promise<NfRecord> {
     this.gc();
     if (idemKey) {
@@ -84,14 +121,8 @@ export class EntitiesService {
       if (hit) return hit.record;
     }
     const { src, fields } = await this.ctx(kind);
-    let properties;
-    try {
-      const { title, status, priority, due, notes, progress } = dto;
-      properties = buildProperties(fields, src.properties, { title, status, priority, due, notes, progress });
-    } catch (e) {
-      if (e instanceof MappingError) throw new UnprocessableEntityException({ code: 'MAPPING', message: e.message });
-      throw e;
-    }
+    const { title, status, priority, due, done, notes, progress, amount } = dto;
+    const properties = this.build(fields, src.properties, { title, status, priority, due, done, notes, progress, amount });
     const page = await this.notion.createPage(src, properties);
     const record = pageToRecord(page, fields);
     if (idemKey) this.idem.set(`${kind}:${idemKey}`, { at: Date.now(), record });
@@ -112,18 +143,13 @@ export class EntitiesService {
     }
     const { expectedLastEdited, ...input } = dto;
     if (Object.keys(input).length === 0) throw new BadRequestException('Nothing to update.');
-    let properties;
-    try {
-      properties = buildProperties(fields, src.properties, input);
-    } catch (e) {
-      if (e instanceof MappingError) throw new UnprocessableEntityException({ code: 'MAPPING', message: e.message });
-      throw e;
-    }
+    const properties = this.build(fields, src.properties, input);
     const page = await this.notion.updatePage(pageId, properties);
     this.sync.bump(pageId, 'updated');
     return pageToRecord(page, fields);
   }
 
+  /** Archives (moves to Notion's trash); recoverable from Notion. */
   async archive(kind: Kind, pageId: string) {
     const current = await this.notion.getPage(pageId);
     this.assertBelongs(current, kind);

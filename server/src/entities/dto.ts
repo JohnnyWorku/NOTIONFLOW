@@ -7,8 +7,10 @@ export class CreateRecordDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) status?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) priority?: string;
   @ApiPropertyOptional({ description: 'ISO 8601 date' }) @IsOptional() @IsISO8601() due?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() done?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(100) progress?: number;
+  @ApiPropertyOptional({ description: 'Generic number (pages read, minutes, reps…)' }) @IsOptional() @IsNumber() @Min(-1_000_000) @Max(1_000_000_000) amount?: number;
 }
 
 export class UpdateRecordDto {
@@ -21,6 +23,7 @@ export class UpdateRecordDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() done?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(100) progress?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(-1_000_000) @Max(1_000_000_000) amount?: number;
 }
 
 export class ListQueryDto {

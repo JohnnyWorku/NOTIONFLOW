@@ -1,13 +1,13 @@
-/// Plain Dart model (no code generation) mirroring the backend NfRecord contract.
+/// Plain Dart models (no code generation) mirroring the backend contract.
 class NfRecord {
   final String id, url, title, lastEdited;
   final String? status, priority, due, notes;
   final bool? done;
-  final double? progress;
+  final double? progress, amount;
 
   const NfRecord({
     required this.id, required this.url, required this.title, required this.lastEdited,
-    this.status, this.priority, this.due, this.notes, this.done, this.progress,
+    this.status, this.priority, this.due, this.notes, this.done, this.progress, this.amount,
   });
 
   factory NfRecord.fromJson(Map<String, dynamic> j) => NfRecord(
@@ -21,12 +21,16 @@ class NfRecord {
         notes: j['notes'] as String?,
         done: j['done'] as bool?,
         progress: (j['progress'] as num?)?.toDouble(),
+        amount: (j['amount'] as num?)?.toDouble(),
       );
+
+  static String _num(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
   String get subtitle => [
         status, priority,
         if (due != null) 'due ${due!.substring(0, 10)}',
         if (progress != null) '${progress!.round()}%',
+        if (amount != null) _num(amount!),
       ].whereType<String>().join(' · ');
 }
 
@@ -38,4 +42,37 @@ class RecordPage {
         (j['items'] as List).map((e) => NfRecord.fromJson(e as Map<String, dynamic>)).toList(),
         j['nextCursor'] as String?,
       );
+}
+
+class CollectionInfo {
+  final String key, label;
+  final String? icon;
+  final bool builtin, configured;
+  const CollectionInfo({required this.key, required this.label, this.icon, required this.builtin, required this.configured});
+  factory CollectionInfo.fromJson(Map<String, dynamic> j) => CollectionInfo(
+        key: j['key'] as String,
+        label: j['label'] as String,
+        icon: j['icon'] as String?,
+        builtin: j['builtin'] == true,
+        configured: j['configured'] == true,
+      );
+}
+
+/// Which Notion properties a collection maps to, plus the allowed Status/Priority options.
+class CollectionMeta {
+  final Map<String, String> fields;
+  final List<String> statuses, priorities;
+  const CollectionMeta({required this.fields, required this.statuses, required this.priorities});
+  bool has(String k) => fields.containsKey(k);
+  factory CollectionMeta.fromJson(Map<String, dynamic> j) {
+    final opts = (j['options'] as Map<String, dynamic>?) ?? const {};
+    return CollectionMeta(
+      fields: {
+        for (final e in ((j['fields'] as Map<String, dynamic>?) ?? const <String, dynamic>{}).entries)
+          if (e.value is String) e.key: e.value as String,
+      },
+      statuses: ((opts['status'] as List?) ?? const []).cast<String>(),
+      priorities: ((opts['priority'] as List?) ?? const []).cast<String>(),
+    );
+  }
 }

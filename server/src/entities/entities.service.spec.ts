@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { EntitiesService } from './entities.service';
 import { SyncService } from '../sync/sync.service';
+import { CollectionsService } from './collections.service';
 
 const schema = { Name: { type: 'title' }, Status: { type: 'status' }, Due: { type: 'date' }, Done: { type: 'checkbox' } };
 const page = (edited: string) => ({
@@ -18,7 +19,7 @@ function setup() {
   };
   const cfg: any = { get: (k: string) => (k === 'NOTION_TASKS_DB' ? 'DB' : undefined) };
   const sync = new SyncService();
-  return { svc: new EntitiesService(notion, cfg, sync), notion, sync };
+  return { svc: new EntitiesService(notion, cfg, sync, new CollectionsService(cfg)), notion, sync };
 }
 
 describe('EntitiesService', () => {

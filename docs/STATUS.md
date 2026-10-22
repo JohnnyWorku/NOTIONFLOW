@@ -1,19 +1,26 @@
 # Status (honest record)
 
-## Environment limits when this was generated
-No network access, no Flutter/Dart, no package installs. **Nothing below has been compiled, run, or tested.**
+## Verified on the owner's machine (earlier build, 0.1)
+Backend Jest + `nest build`, web typecheck/tests/`next build`, APK build + install flow.
 
-| Area | Written | Compiled | Tests run | Verified against real Notion |
-|------|:--:|:--:|:--:|:--:|
-| NestJS backend (health, notion, tasks/projects/goals/learning, dashboard, sync, webhook, auth, rate limit) | yes | **no** | **no** (Jest specs written, mocked) | **no** |
-| Next.js web (dashboard, tasks CRUD-ish, lists, settings, proxy) | yes | **no** | **no** (vitest schema tests written) | no |
-| Flutter (nav, dashboard, tasks, lists, settings, API client) | yes | **no** | **no** (model tests written) | no |
-| Deployment configs, APK build | docs only | no | no | no |
+## 0.2 changes: what has actually been run
+| Item | Written | Executed here |
+|---|:--:|:--:|
+| Session-token signing/verification, password compare | yes | **yes** (Node script, all assertions passed) |
+| Statistics maths (streaks, timezone days, task/collection summaries) | yes | **yes** (Node script) |
+| Property mapping incl. `amount`/`created` | yes | **yes** (Node script) |
+| Nest wiring (auth guard, collections, stats, controllers), Jest specs | yes | **no** (needs `npm test -w server`) |
+| Web login/middleware/proxy, dialog, collection view, stats UI | yes | **no** (needs `npm run build -w web`) |
+| Flutter login/router/forms/stats | yes | **no** (needs `flutter analyze && flutter test`) |
+| Deployment (Render/Vercel/GitHub Releases) | docs + render.yaml | **no** |
 
-## Known risks to check first
-1. `@notionhq/client` v5 / API `2025-09-03` data-source methods (`dataSources.query/retrieve`) were written from memory; confirm against current docs. All SDK calls are in `server/src/notion/notion.service.ts`.
-2. Package versions are caret ranges chosen without registry access; `npm install` may need small bumps.
-3. Expect a handful of type errors on first `tsc`/`flutter analyze`; send them to me.
+## New in 0.2
+Login (web cookie session + mobile login screen), public APK link via `APK_URL`, custom collections (`NOTION_COLLECTIONS`),
+Notion-driven Status/Priority dropdowns, edit + delete + load-more on web and mobile, statistics (dashboard + /stats + mobile tab).
 
-## Not implemented yet
-Task editing UI beyond completion toggle, delete UI, pagination "load more" in clients, notes quick-capture screen, AI assistant, OAuth, offline cache, PostgreSQL, CI, Docker, Android signing config, shared OpenAPI-generated Dart client.
+## Known limits
+- Task completion day is estimated from last edit (Notion stores no completion time).
+- Statistics read up to 300 records per table.
+- Single owner, single backend instance; in-memory sync state resets on restart.
+- Login lockout caveat behind Vercel (see deployment.md section 9).
+- Not built: offline cache, push notifications, AI assistant, multi-user accounts, multi-select/formula properties, Google Play signing.

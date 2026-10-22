@@ -1,9 +1,28 @@
 export interface NfRecord {
   id: string; url: string; title: string; status: string | null; priority: string | null;
-  due: string | null; done: boolean | null; progress: number | null; relatedIds: string[];
-  notes: string | null; lastEdited: string; unsupported: string[];
+  due: string | null; done: boolean | null; progress: number | null; amount: number | null;
+  relatedIds: string[]; notes: string | null; created: string; lastEdited: string; unsupported: string[];
 }
-export interface Page<T> { items: T[]; nextCursor: string | null }
+export interface Page<T> { items: T[]; nextCursor: string | null; mapping?: Record<string, string | undefined> }
+export interface Collection { key: string; label: string; icon?: string; builtin: boolean; description?: string; configured: boolean }
+export interface Meta {
+  key: string; label: string; fields: Record<string, string | undefined>;
+  options: { status: string[]; priority: string[] };
+}
+export interface DayCount { date: string; count: number }
+export interface Tally { name: string; count: number }
+export interface TaskStats {
+  total: number; done: number; open: number; overdue: number; completionRate: number | null;
+  completedInRange: number; completedByDay: DayCount[]; last7: number; prev7: number;
+  currentStreak: number; longestStreak: number; byStatus: Tally[]; byPriority: Tally[]; approximate: boolean;
+}
+export interface CollectionStats {
+  key: string; label: string; icon?: string; builtin: boolean; total: number; doneCount: number;
+  completionRate: number | null; avgProgress: number | null; hasAmount: boolean; amountInRange: number;
+  entriesInRange: number; entriesByDay: DayCount[]; amountByDay: DayCount[]; byStatus: Tally[]; truncated: boolean;
+}
+export interface Stats { generatedAt: string; rangeDays: number; tasks: TaskStats | null; collections: CollectionStats[] }
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: any) { super(message); }
 }
@@ -11,10 +30,16 @@ export class ApiError extends Error {
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api/proxy/${path}`, { ...init, headers: { 'content-type': 'application/json', ...init?.headers } });
   const text = await res.text();
-  const body = text ? JSON.parse(text) : null;
+  let body: any = null;
+  try { body = text ? JSON.parse(text) : null; } catch { /* non-JSON error page */ }
+  if (res.status === 401 && typeof window !== 'undefined' && !['/login', '/download'].includes(window.location.pathname)) {
+    window.location.href = '/login';
+  }
   if (!res.ok) throw new ApiError(res.status, body?.message ?? `Request failed (${res.status})`, body);
   return body as T;
 }
 
-export const Kinds = ['tasks', 'projects', 'goals', 'learning'] as const;
-export type Kind = (typeof Kinds)[number];
+export async function signOut() {
+  await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+  window.location.href = '/login';
+}

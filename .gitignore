@@ -23,3 +23,7 @@ apps/mobile/android/key.properties
 *.keystore
 *.apk
 *.aab
+
+# Published APK (built locally, never committed)
+apps/web/downloads/*
+!apps/web/downloads/.gitkeep

@@ -25,7 +25,10 @@ cd apps/mobile && flutter analyze && flutter test
 ```
 Paste me any error output and I will fix it.
 
-## 3. Connect Notion
+## 3. Sign-in
+Set `APP_PASSWORD` (your password) and `AUTH_SECRET` (`openssl rand -hex 32`) in `server/.env`, restart the backend. The web app and the mobile app both show a login screen.
+
+## 3b. Connect Notion
 Follow `docs/notion-setup.md`, then:
 ```bash
 npm run dev:server            # terminal 1
@@ -37,11 +40,17 @@ curl localhost:4000/api/health
 ```bash
 cd apps/mobile && flutter run
 ```
-In the app Settings: emulator URL `http://10.0.2.2:4000/api`; physical phone `http://<laptop-IP>:4000/api` (find IP with `hostname -I`; same Wi-Fi; allow port with `sudo ufw allow 4000/tcp`). Paste your `APP_API_KEY`.
+In the app Settings: emulator URL `http://10.0.2.2:4000/api`; physical phone `http://<laptop-IP>:4000/api` (find IP with `hostname -I`; same Wi-Fi; allow port with `sudo ufw allow 4000/tcp`). Sign in with your `APP_PASSWORD`.
 
 Install Flutter on Ubuntu: https://docs.flutter.dev/get-started/install/linux/android (needs Android Studio/SDK, then `flutter doctor`).
 
 APK for direct install: `flutter build apk --release`. Play Store: `flutter build appbundle --release` (requires a signing keystore; see Flutter docs "Build and release an Android app").
 
 ## Production notes
-Set `NODE_ENV=production`, a strong `APP_API_KEY` (`openssl rand -hex 32`), `WEB_ORIGIN` to your web URL, serve everything over HTTPS, and keep `NOTION_TOKEN` only in the host's secret store. Deploy `server/` to any Node host (Render/Fly/Railway/VPS), `apps/web` to Vercel or the same host, setting `API_BASE_URL` and `APP_API_KEY` as server-side env vars. Rotate by generating a new key, updating the server and clients; rotate the Notion token in the Notion integration page.
+Set `NODE_ENV=production`, `APP_PASSWORD` and `AUTH_SECRET` (`openssl rand -hex 32`), `WEB_ORIGIN` to your web URL, serve everything over HTTPS, and keep `NOTION_TOKEN` only in the host's secret store. Deploy `server/` to any Node host (Render/Fly/Railway/VPS), `apps/web` to Vercel or the same host, setting `API_BASE_URL` as a server-side env var. Full steps: docs/deployment.md. rotate the Notion token in the Notion integration page.
+
+
+## More docs
+- `docs/deployment.md`: full Render + Vercel + APK hosting guide
+- `docs/custom-collections.md`: add Spiritual/Health/any table
+- `docs/STATUS.md`: what is verified and what is not

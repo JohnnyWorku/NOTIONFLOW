@@ -1,10 +1,6 @@
 'use client';
-import { RecordList } from '@/components/records';
+import { CollectionView } from '@/components/collection-view';
+
 export default function Page() {
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Goals</h1>
-      <RecordList kind="goals" emptyText="No goals found." />
-    </div>
-  );
+  return <CollectionView ckey="goals" title="Goals" subtitle="Long-term goals and how far along they are" />;
 }

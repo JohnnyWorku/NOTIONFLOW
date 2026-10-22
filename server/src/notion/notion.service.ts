@@ -38,7 +38,7 @@ export class NotionService {
   }
 
   /** Retry on rate limits / transient 5xx with backoff, translate Notion errors to safe HTTP errors. */
-  private async call<T>(fn: () => Promise<T>): Promise<T> {
+  private async call(fn: () => Promise<any>): Promise<any> {
     let attempt = 0;
     for (;;) {
       try {

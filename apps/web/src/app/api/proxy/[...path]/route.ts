@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Server-side proxy: the browser calls /api/proxy/*, this adds the API key and forwards to NestJS.
- * Keeps APP_API_KEY out of client bundles. Only an allowlist of first path segments is forwarded.
+ * Server-side proxy: the browser calls /api/proxy/*, this attaches the user's session token (from an httpOnly
+ * cookie, invisible to page scripts) and forwards to NestJS. Only an allowlist of first path segments is forwarded.
  */
-const ALLOWED = new Set(['tasks', 'projects', 'goals', 'learning', 'dashboard', 'sync', 'notion', 'health']);
+const ALLOWED = new Set(['tasks', 'projects', 'goals', 'learning', 'c', 'collections', 'dashboard', 'stats', 'sync', 'notion', 'health']);
 
 async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
   if (!ALLOWED.has(path[0])) return NextResponse.json({ message: 'Not found' }, { status: 404 });
+  const token = req.cookies.get('nf_session')?.value;
+  if (!token) return NextResponse.json({ message: 'Not signed in.' }, { status: 401 });
+
   const base = process.env.API_BASE_URL ?? 'http://localhost:4000/api';
   const url = `${base}/${path.map(encodeURIComponent).join('/')}${req.nextUrl.search}`;
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (process.env.APP_API_KEY) headers.authorization = `Bearer ${process.env.APP_API_KEY}`;
+  const headers: Record<string, string> = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
   const idem = req.headers.get('idempotency-key');
   if (idem) headers['idempotency-key'] = idem;
   try {
