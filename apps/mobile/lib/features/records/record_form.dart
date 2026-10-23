@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/widgets/app_card.dart';
 import '../tasks/record.dart';
 import '../tasks/records_repository.dart';
 
@@ -108,7 +109,7 @@ class _FormState extends ConsumerState<RecordFormSheet> {
   Widget _choice(String label, String? value, List<String> options, ValueChanged<String?> onChanged) {
     final opts = value != null && !options.contains(value) ? [value, ...options] : options;
     return InputDecorator(
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 12)),
+      decoration: fieldDecoration(context, label: label),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
@@ -134,12 +135,12 @@ class _FormState extends ConsumerState<RecordFormSheet> {
           child: Form(
             key: _form,
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(widget.existing == null ? 'New ${widget.label}' : 'Edit', style: Theme.of(context).textTheme.titleLarge),
+              Text(widget.existing == null ? 'New ${widget.label}' : 'Edit', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _title,
                 autofocus: widget.existing == null,
-                decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),
+                decoration: fieldDecoration(context, label: 'Title'),
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required' : null,
               ),
               if (meta.has('status')) ...[
@@ -153,7 +154,7 @@ class _FormState extends ConsumerState<RecordFormSheet> {
               if (meta.has('due')) ...[
                 const SizedBox(height: 12),
                 InputDecorator(
-                  decoration: const InputDecoration(labelText: 'Date', border: OutlineInputBorder()),
+                  decoration: fieldDecoration(context, label: 'Date'),
                   child: Row(children: [
                     Expanded(child: Text(_due == null ? 'Not set' : _ymd(_due!))),
                     if (_due != null) IconButton(tooltip: 'Clear date', icon: const Icon(Icons.clear), onPressed: () => setState(() => _due = null)),
@@ -173,7 +174,7 @@ class _FormState extends ConsumerState<RecordFormSheet> {
                 TextFormField(
                   controller: _progress,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Progress (0–100)', border: OutlineInputBorder()),
+                  decoration: fieldDecoration(context, label: 'Progress (0–100)'),
                   validator: (v) {
                     final t = (v ?? '').trim();
                     if (t.isEmpty) return null;
@@ -187,7 +188,7 @@ class _FormState extends ConsumerState<RecordFormSheet> {
                 TextFormField(
                   controller: _amount,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                  decoration: InputDecoration(labelText: meta.fields['amount'] ?? 'Amount', border: const OutlineInputBorder()),
+                  decoration: fieldDecoration(context, label: meta.fields['amount'] ?? 'Amount'),
                   validator: (v) {
                     final t = (v ?? '').trim();
                     return t.isEmpty || double.tryParse(t) != null ? null : 'Enter a number';
@@ -204,7 +205,7 @@ class _FormState extends ConsumerState<RecordFormSheet> {
                 ),
               if (meta.has('notes')) ...[
                 const SizedBox(height: 12),
-                TextFormField(controller: _notes, maxLines: 3, decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder())),
+                TextFormField(controller: _notes, maxLines: 3, decoration: fieldDecoration(context, label: 'Notes')),
               ],
               if (_error != null) ...[
                 const SizedBox(height: 12),

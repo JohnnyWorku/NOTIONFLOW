@@ -10,6 +10,7 @@ Auth: `POST /api/auth/login {password}` -> `{token, expiresAt}`; then `Authoriza
   - POST header `Idempotency-Key`; PATCH requires `expectedLastEdited` (409 + current record when stale)
   - body fields: `title status priority due done progress amount notes`
 - Legacy aliases: `/api/tasks`, `/api/projects`, `/api/goals`, `/api/learning` (same behaviour)
+- `GET /api/home` live overview: recent records per table, relation titles, optional mirrored Notion home page (cached until a write or 60s)
 - `GET /api/dashboard`
 - `GET /api/stats?days=7..365&tz=<minutes east of UTC>` performance statistics (cached 60s)
 - `GET /api/notion/databases`, `GET /api/notion/databases/:id/schema`

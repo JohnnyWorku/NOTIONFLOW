@@ -23,6 +23,20 @@ export interface CollectionStats {
 }
 export interface Stats { generatedAt: string; rangeDays: number; tasks: TaskStats | null; collections: CollectionStats[] }
 
+export interface Seg { text: string; bold?: boolean; italic?: boolean; code?: boolean; strike?: boolean; href?: string }
+export interface Block {
+  id: string; type: 'heading' | 'text' | 'bullet' | 'number' | 'todo' | 'callout' | 'quote' | 'divider' | 'toggle' | 'columns' | 'column' | 'database' | 'page' | 'link';
+  level?: 1 | 2 | 3; text?: Seg[]; checked?: boolean; icon?: string; title?: string; url?: string; collectionKey?: string; children?: Block[];
+}
+export interface Related { id: string; title: string; status: string | null; url: string; collectionKey?: string }
+export interface HomeSection { key: string; label: string; icon?: string; builtin: boolean; items: NfRecord[]; hasMore: boolean; error?: string }
+export interface HomeData {
+  generatedAt: string;
+  page: { title: string; url: string | null; blocks: Block[]; skipped: number; truncated: boolean; error: string | null } | null;
+  sections: HomeSection[];
+  related: Record<string, Related>;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: any) { super(message); }
 }

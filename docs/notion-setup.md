@@ -9,3 +9,11 @@
 { "tasks": { "status": "Stage", "due": "Deadline" }, "goals": { "progress": "Completion %" } }
 ```
 7. **Webhooks (optional, near-real-time)**: need a public HTTPS URL (e.g. `cloudflared tunnel` in dev). In the integration's Webhooks tab subscribe to `https://<host>/api/sync/webhook`. Notion sends a verification token; the server logs it once; paste it in Notion and in `NOTION_WEBHOOK_SECRET`, restart. Without webhooks, clients still poll every 15s but the server only learns of edits made *in Notion* when a client refetches (list calls always read live from Notion).
+
+8. **Home page mirror (optional)**: if you have a Notion page that acts as your home (it links or embeds your tables), NotionFlow can show it on the Home screen.
+   - Open the page in Notion → `···` → **Connections** → add your integration (a page must be shared separately from its databases).
+   - Copy its link (`···` → Copy link). The ID is the last 32 letters/digits of the URL (before any `?`), for example `https://www.notion.so/Home-0123456789abcdef0123456789abcdef` → `0123456789abcdef0123456789abcdef`.
+   - Set `NOTION_HOME_PAGE_ID=<that id>` in `server/.env` (or on Render) and restart/redeploy.
+   - Shown: headings, text, lists, to-dos, callouts, quotes, toggles, columns, bookmarks, and links to pages. **Inline databases** whose ID or title matches one of your connected tables become buttons that open that table inside NotionFlow.
+   - Not shown (Notion's API does not provide them): images, embeds, and **linked database views** (a database view placed on the page that lives elsewhere). They are counted in a small "N blocks can't be shown" note. Your connected tables still appear in the "Your tables" section of Home.
+   - Even without this setting, Home shows a card for every connected table, with the records they link to through Notion relations.

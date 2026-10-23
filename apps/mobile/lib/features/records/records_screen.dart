@@ -1,39 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/record_card.dart';
 import '../../core/widgets/state_views.dart';
 import '../tasks/record.dart';
 import '../tasks/records_repository.dart';
 import 'record_form.dart';
 
-class RecordTile extends StatelessWidget {
-  final NfRecord r;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
-  const RecordTile(this.r, {super.key, this.trailing, this.onTap, this.onLongPress});
-
-  @override
-  Widget build(BuildContext context) {
-    final done = r.done == true;
-    return ListTile(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      title: Text(r.title, style: done ? const TextStyle(decoration: TextDecoration.lineThrough) : null),
-      subtitle: r.subtitle.isEmpty ? null : Text(r.subtitle),
-      trailing: trailing ??
-          IconButton(
-            tooltip: 'Open in Notion',
-            icon: const Icon(Icons.open_in_new),
-            onPressed: () => launchUrl(Uri.parse(r.url), mode: LaunchMode.externalApplication),
-          ),
-    );
-  }
-}
-
 /// One screen for Tasks, Projects, Goals, Learning and every custom table.
-/// Tap = edit, long-press = delete, checkbox = mark done, FAB = create.
+/// Tap = edit, long-press = delete, checkbox = mark done, + = create.
 class RecordsScreen extends ConsumerStatefulWidget {
   final String kind;
   const RecordsScreen({super.key, required this.kind});
@@ -102,6 +78,7 @@ class _RecordsState extends ConsumerState<RecordsScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      showDragHandle: true,
       builder: (_) => RecordFormSheet(kind: widget.kind, label: _label, existing: existing),
     );
     if (changed == true) _load(silent: true);
@@ -148,60 +125,58 @@ class _RecordsState extends ConsumerState<RecordsScreen> {
     ref.listen<int?>(syncVersionProvider, (prev, next) {
       if (prev != null && next != null && prev != next) _load(silent: true);
     });
-    final metaAsync = ref.watch(metaProvider(widget.kind));
-    final showOverdue = metaAsync.valueOrNull?.has('due') == true && metaAsync.valueOrNull?.has('done') == true;
-    final canPop = Navigator.of(context).canPop();
+    final meta = ref.watch(metaProvider(widget.kind)).valueOrNull;
+    final showOverdue = meta != null && meta.has('due') && meta.has('done');
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_label),
-        automaticallyImplyLeading: canPop,
-        actions: [
-          if (showOverdue)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(label: const Text('Overdue'), selected: _overdue, onSelected: (v) { _overdue = v; _load(); }),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: Text(_label), automaticallyImplyLeading: Navigator.of(context).canPop()),
       floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), tooltip: 'New', child: const Icon(Icons.add)),
       body: Column(children: [
         Padding(
-          padding: const EdgeInsets.all(12),
-          child: TextField(
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search', border: OutlineInputBorder()),
-            textInputAction: TextInputAction.search,
-            onSubmitted: (v) { _search = v.trim(); _load(); },
-          ),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                decoration: fieldDecoration(context, hint: 'Search ${_label.toLowerCase()}', icon: Icons.search),
+                textInputAction: TextInputAction.search,
+                onSubmitted: (v) { _search = v.trim(); _load(); },
+              ),
+            ),
+            if (showOverdue) ...[
+              const SizedBox(width: 8),
+              FilterChip(label: const Text('Overdue'), selected: _overdue, onSelected: (v) { _overdue = v; _load(); }),
+            ],
+          ]),
         ),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const Padding(padding: EdgeInsets.all(16), child: SkeletonList(count: 5))
               : _error != null
                   ? ErrorView(error: _error!, onRetry: _load)
                   : RefreshIndicator(
                       onRefresh: () => _load(silent: true),
                       child: _items.isEmpty
-                          ? ListView(children: [SizedBox(height: 200, child: EmptyView('No ${_label.toLowerCase()} found.'))])
-                          : ListView.builder(
+                          ? ListView(children: [SizedBox(height: 260, child: EmptyView('No ${_label.toLowerCase()} found.'))])
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                               itemCount: _items.length + (_cursor != null ? 1 : 0),
+                              separatorBuilder: (_, __) => const SizedBox(height: 10),
                               itemBuilder: (_, i) {
                                 if (i == _items.length) {
-                                  return Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Center(
-                                      child: _loadingMore
-                                          ? const CircularProgressIndicator()
-                                          : OutlinedButton(onPressed: _loadMore, child: const Text('Load more')),
-                                    ),
+                                  return Center(
+                                    child: _loadingMore
+                                        ? const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator())
+                                        : OutlinedButton(onPressed: _loadMore, child: const Text('Load more')),
                                   );
                                 }
                                 final r = _items[i];
-                                return RecordTile(
+                                return RecordCard(
                                   r,
                                   onTap: () => _openForm(r),
                                   onLongPress: () => _confirmDelete(r),
-                                  trailing: r.done == null ? null : Checkbox(value: r.done, onChanged: (_) => _toggle(r)),
+                                  leading: r.done == null
+                                      ? null
+                                      : Checkbox(value: r.done, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)), onChanged: (_) => _toggle(r)),
                                 );
                               },
                             ),

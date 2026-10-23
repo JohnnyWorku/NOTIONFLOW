@@ -10,6 +10,7 @@ import { SyncModule } from './sync/sync.module';
 import { HealthModule } from './health/health.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { StatsModule } from './stats/stats.module';
+import { HomeModule } from './home/home.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { StatsModule } from './stats/stats.module';
     EntitiesModule,
     DashboardModule,
     StatsModule,
+    HomeModule,
     HealthModule,
   ],
   providers: [

@@ -18,9 +18,15 @@ Backend Jest + `nest build`, web typecheck/tests/`next build`, APK build + insta
 Login (web cookie session + mobile login screen), public APK link via `APK_URL`, custom collections (`NOTION_COLLECTIONS`),
 Notion-driven Status/Priority dropdowns, edit + delete + load-more on web and mobile, statistics (dashboard + /stats + mobile tab).
 
+## 0.3 changes
+- Home screen (web + mobile): Notion home page mirror (`NOTION_HOME_PAGE_ID`), a card per connected table, relation chips across tables, Quick add.
+- Mobile redesign: new theme with dark mode, card-based lists, status/priority/due chips, skeleton loading, gradient Home header, restyled login/tables/stats/settings.
+- Executed here: block conversion logic (Node script). Not executed: Nest wiring, web build, Flutter analyze/test.
+
 ## Known limits
 - Task completion day is estimated from last edit (Notion stores no completion time).
 - Statistics read up to 300 records per table.
+- Notion's API cannot return images, embeds or linked database views, so those parts of a home page are not mirrored.
 - Single owner, single backend instance; in-memory sync state resets on restart.
 - Login lockout caveat behind Vercel (see deployment.md section 9).
 - Not built: offline cache, push notifications, AI assistant, multi-user accounts, multi-select/formula properties, Google Play signing.

@@ -8,7 +8,7 @@ import { iconFor } from '@/lib/icons';
 
 interface Item { href: string; label: string; icon: LucideIcon }
 const MAIN: Item[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/stats', label: 'Statistics', icon: Activity },
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/projects', label: 'Projects', icon: FolderKanban },

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/widgets/app_card.dart';
 import '../../core/widgets/icon_map.dart';
 import '../../core/widgets/mini_bars.dart';
 import '../../core/widgets/state_views.dart';
@@ -32,13 +33,18 @@ class _StatsState extends ConsumerState<StatsScreen> {
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(statsProvider(_days)),
             child: ListView(padding: const EdgeInsets.all(16), children: [
-              Wrap(spacing: 8, children: [
-                for (final d in const [7, 30, 90])
-                  ChoiceChip(label: Text('${d}d'), selected: _days == d, onSelected: (_) => setState(() => _days = d)),
-              ]),
-              const SizedBox(height: 12),
+              SegmentedButton<int>(
+                segments: const [
+                  ButtonSegment(value: 7, label: Text('7 days')),
+                  ButtonSegment(value: 30, label: Text('30 days')),
+                  ButtonSegment(value: 90, label: Text('90 days')),
+                ],
+                selected: {_days},
+                onSelectionChanged: (v) => setState(() => _days = v.first),
+              ),
+              const SizedBox(height: 14),
               if (t == null)
-                const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Connect your Tasks database to see task performance.')))
+                const AppCard(child: Text('Connect your Tasks database to see task performance.'))
               else
                 _TasksCard(t: t, days: _days),
               for (final c in cols) _CollectionCard(c: c, days: _days),
@@ -61,11 +67,11 @@ class _TasksCard extends StatelessWidget {
     final last7 = _i(t['last7']);
     final prev7 = _i(t['prev7']);
     final delta = last7 - prev7;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Tasks', style: Theme.of(context).textTheme.titleMedium),
+          Text('Tasks', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           Row(children: [
             SizedBox(
@@ -109,14 +115,14 @@ class _CollectionCard extends StatelessWidget {
     final hasAmount = c['hasAmount'] == true && (c['amountInRange'] as num) > 0;
     final series = hasAmount ? c['amountByDay'] : c['entriesByDay'];
     final avg = c['avgProgress'];
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Icon(collectionIcon(c['icon'] as String?), size: 20),
+            Icon(collectionIcon(c['icon'] as String?), size: 20, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
-            Text(c['label'] as String, style: Theme.of(context).textTheme.titleMedium),
+            Text(c['label'] as String, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           ]),
           const SizedBox(height: 12),
           Wrap(spacing: 20, runSpacing: 8, children: [

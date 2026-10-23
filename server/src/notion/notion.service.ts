@@ -123,6 +123,16 @@ export class NotionService {
     );
   }
 
+  /** Children of a block/page (used to mirror your Notion home page). */
+  listBlocks(blockId: string, cursor?: string): Promise<any> {
+    return this.call(() => this.c().blocks.children.list({ block_id: blockId, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) }));
+  }
+
+  /** Resolved queryable id for a configured database id, if its schema was already loaded. */
+  cachedSourceId(id: string): string | undefined {
+    return this.cache.get(id)?.id;
+  }
+
   getPage(pageId: string): Promise<any> {
     return this.call(() => this.c().pages.retrieve({ page_id: pageId }));
   }

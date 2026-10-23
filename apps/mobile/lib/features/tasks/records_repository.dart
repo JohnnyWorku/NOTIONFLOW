@@ -44,6 +44,8 @@ class RecordsRepository {
     return (data as Map<String, dynamic>)['version'] as int;
   }
 
+  Future<Map<String, dynamic>> home() async => (await api.request('GET', '/home')) as Map<String, dynamic>;
+
   Future<Map<String, dynamic>> dashboard() async => (await api.request('GET', '/dashboard')) as Map<String, dynamic>;
 
   Future<Map<String, dynamic>> stats(int days, int tzMinutes) async =>

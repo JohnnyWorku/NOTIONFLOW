@@ -1,13 +1,16 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CalendarClock, CalendarDays, Flame, FolderKanban, GraduationCap, Plus, Target, type LucideIcon } from 'lucide-react';
-import { api, NfRecord } from '@/lib/api';
+import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CalendarClock, CalendarDays, ExternalLink, Flame, GraduationCap, FolderKanban, Target, type LucideIcon } from 'lucide-react';
+import { api, Collection, HomeData, NfRecord, Related } from '@/lib/api';
 import { greeting, type Tone } from '@/lib/format';
 import { useStats } from '@/lib/hooks';
+import { iconFor } from '@/lib/icons';
 import { Empty, ErrorBox, ICON_TONE, Loading, PageHeader } from '@/components/ui';
 import { RecordRow } from '@/components/records';
 import { BarChart, Ring } from '@/components/charts';
+import { NotionBlocks } from '@/components/notion-blocks';
+import { QuickAdd } from '@/components/quick-add';
 
 interface Dash {
   notion: { configured: boolean }; sync: { version: number; lastWebhookAt: string | null };
@@ -15,7 +18,6 @@ interface Dash {
   projects: { active: NfRecord[] } | null;
   goals: { items: NfRecord[]; averageProgress: number | null } | null;
   learning: { items: NfRecord[]; averageProgress: number | null } | null;
-  recent: NfRecord[];
 }
 
 function Stat({ label, value, tone, icon: Icon }: { label: string; value: string; tone: Tone; icon: LucideIcon }) {
@@ -30,7 +32,7 @@ function Stat({ label, value, tone, icon: Icon }: { label: string; value: string
   );
 }
 
-function Section({ title, items, empty }: { title: string; items: NfRecord[] | undefined; empty: string }) {
+function Focus({ title, items, empty }: { title: string; items: NfRecord[] | undefined; empty: string }) {
   return (
     <section>
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -88,26 +90,48 @@ function Performance() {
   );
 }
 
-export default function Dashboard() {
-  const q = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dash>('dashboard') });
-  if (q.isLoading) return <Loading />;
-  if (q.isError) return <ErrorBox error={q.error} retry={() => q.refetch()} />;
-  const d = q.data!;
+function NotionHome({ page }: { page: NonNullable<HomeData['page']> }) {
+  return (
+    <section className="card">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="font-semibold">{page.title}</h2>
+        {page.url && <a href={page.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline">Open in Notion <ExternalLink size={13} /></a>}
+      </div>
+      {page.error ? <p role="alert" className="text-sm text-amber-800">{page.error}</p> : <NotionBlocks blocks={page.blocks} />}
+      {(page.skipped > 0 || page.truncated) && (
+        <p className="mt-3 text-[11px] text-slate-400">
+          {page.skipped > 0 && `${page.skipped} block${page.skipped === 1 ? '' : 's'} (images, linked database views, embeds…) can’t be shown here. `}
+          {page.truncated && 'Showing the first part of a long page.'}
+        </p>
+      )}
+    </section>
+  );
+}
+
+export default function Home() {
+  const dash = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dash>('dashboard') });
+  const home = useQuery({ queryKey: ['home'], queryFn: () => api<HomeData>('home') });
+  const cols = useQuery({ queryKey: ['collections'], queryFn: () => api<Collection[]>('collections'), staleTime: 5 * 60_000 });
+
+  if (dash.isLoading) return <Loading />;
+  if (dash.isError) return <ErrorBox error={dash.error} retry={() => dash.refetch()} />;
+  const d = dash.data!;
   const n = (xs?: unknown[]) => (xs ? String(xs.length) : '—');
   const pct = (v?: number | null) => (v === null || v === undefined ? '—' : `${v}%`);
   const nothing = !d.tasks && !d.projects && !d.goals && !d.learning;
+  const relatedFor = (r: NfRecord): Related[] => (r.relatedIds ?? []).map((id) => home.data?.related[id]).filter((x): x is Related => !!x);
 
   return (
     <div className="space-y-8">
       <PageHeader
         title={`${greeting()} 👋`}
-        subtitle={d.sync.lastWebhookAt ? `Live sync active · last Notion event ${new Date(d.sync.lastWebhookAt).toLocaleTimeString()}` : 'Syncs with Notion every 15 seconds'}
-        action={<Link href="/tasks" className="btn"><Plus size={16} /> New task</Link>}
+        subtitle={d.sync.lastWebhookAt ? `Live sync active · last Notion event ${new Date(d.sync.lastWebhookAt).toLocaleTimeString()}` : 'Your Notion home · syncs every 15 seconds'}
+        action={<QuickAdd collections={cols.data ?? []} />}
       />
       {!d.notion.configured && (
         <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Notion is not configured on the server. See docs/notion-setup.md.</p>
       )}
-      {nothing && d.notion.configured && <Empty text="No databases configured yet. Add the NOTION_*_DB IDs to server/.env and restart the backend." />}
+      {nothing && d.notion.configured && <Empty text="No databases configured yet. Add the NOTION_*_DB IDs to the server settings and restart/redeploy the backend." />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Stat label="Overdue" value={n(d.tasks?.overdue)} tone="red" icon={AlertTriangle} />
@@ -120,13 +144,34 @@ export default function Dashboard() {
 
       <Performance />
 
+      {home.data?.page && <NotionHome page={home.data.page} />}
+
       <div className="grid gap-8 lg:grid-cols-2">
-        <Section title="Overdue" items={d.tasks?.overdue} empty="Nothing overdue. 🎉" />
-        <Section title="Today" items={d.tasks?.today} empty="No tasks due today." />
-        <Section title="Upcoming" items={d.tasks?.upcoming} empty="No upcoming deadlines." />
-        <Section title="Active projects" items={d.projects?.active} empty="No active projects." />
+        <Focus title="Overdue" items={d.tasks?.overdue} empty="Nothing overdue. 🎉" />
+        <Focus title="Today" items={d.tasks?.today} empty="No tasks due today." />
       </div>
-      <Section title="Recently updated" items={d.recent} empty="No recent records." />
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-slate-700">Your tables</h2>
+        {home.isLoading ? <Loading /> : home.isError ? <ErrorBox error={home.error} retry={() => home.refetch()} /> : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            {home.data!.sections.map((s) => {
+              const Icon = iconFor(s.icon);
+              return (
+                <div key={s.key} className="card space-y-3 !p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="flex items-center gap-2 font-semibold"><Icon size={18} className="text-indigo-600" /> {s.label}</h3>
+                    <Link href={`/c/${s.key}`} className="text-sm font-medium text-indigo-600 hover:underline">{s.hasMore ? 'View all →' : 'Open →'}</Link>
+                  </div>
+                  {s.error ? <p className="text-sm text-rose-700">{s.error}</p> : s.items.length === 0 ? <p className="text-sm text-slate-500">Nothing here yet.</p> : (
+                    <ul className="space-y-2">{s.items.map((r) => <RecordRow key={r.id} r={r} dense related={relatedFor(r)} />)}</ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

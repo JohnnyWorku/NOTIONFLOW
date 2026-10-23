@@ -78,6 +78,7 @@ Never paste these into chat, issues, or Git.
 | `NOTION_TOKEN` | your Notion integration secret |
 | `NOTION_TASKS_DB`, `NOTION_PROJECTS_DB`, `NOTION_GOALS_DB`, `NOTION_LEARNING_DB` | database IDs (leave out the ones you do not use) |
 | `NOTION_COLLECTIONS` | JSON for extra tables, **one line**, see custom-collections.md |
+| `NOTION_HOME_PAGE_ID` | *(optional)* ID of your Notion home page, see notion-setup.md step 8 |
 | `APP_PASSWORD` | your login password |
 | `AUTH_SECRET` | the 64-hex-character value from section 3 |
 | `WEB_ORIGIN` | your Vercel URL (add after step 5; start with `http://localhost:3000`) |

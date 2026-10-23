@@ -4,10 +4,12 @@ class NfRecord {
   final String? status, priority, due, notes;
   final bool? done;
   final double? progress, amount;
+  final List<String> relatedIds;
 
   const NfRecord({
     required this.id, required this.url, required this.title, required this.lastEdited,
     this.status, this.priority, this.due, this.notes, this.done, this.progress, this.amount,
+    this.relatedIds = const [],
   });
 
   factory NfRecord.fromJson(Map<String, dynamic> j) => NfRecord(
@@ -22,6 +24,7 @@ class NfRecord {
         done: j['done'] as bool?,
         progress: (j['progress'] as num?)?.toDouble(),
         amount: (j['amount'] as num?)?.toDouble(),
+        relatedIds: ((j['relatedIds'] as List?) ?? const []).cast<String>(),
       );
 
   static String _num(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
@@ -75,4 +78,18 @@ class CollectionMeta {
       priorities: ((opts['priority'] as List?) ?? const []).cast<String>(),
     );
   }
+}
+
+/// A record linked through a Notion relation (possibly in another table).
+class RelatedInfo {
+  final String id, title, url;
+  final String? status, collectionKey;
+  const RelatedInfo({required this.id, required this.title, required this.url, this.status, this.collectionKey});
+  factory RelatedInfo.fromJson(Map<String, dynamic> j) => RelatedInfo(
+        id: j['id'] as String,
+        title: (j['title'] ?? 'Untitled') as String,
+        url: (j['url'] ?? '') as String,
+        status: j['status'] as String?,
+        collectionKey: j['collectionKey'] as String?,
+      );
 }

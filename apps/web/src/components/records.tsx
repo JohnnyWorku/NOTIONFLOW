@@ -1,10 +1,23 @@
 'use client';
-import { Calendar, ExternalLink, Pencil, Search } from 'lucide-react';
-import type { NfRecord } from '@/lib/api';
+import { Calendar, ExternalLink, Link2, Pencil, Search } from 'lucide-react';
+import Link from 'next/link';
+import type { NfRecord, Related } from '@/lib/api';
 import { formatDue, priorityTone, statusTone } from '@/lib/format';
 import { Pill, ProgressBar } from './ui';
 
-export function RecordRow({ r, leading, dense, onEdit }: { r: NfRecord; leading?: React.ReactNode; dense?: boolean; onEdit?: () => void }) {
+export function RelatedChips({ items }: { items: Related[] }) {
+  if (items.length === 0) return null;
+  const cls = 'inline-flex max-w-[11rem] items-center gap-1 truncate rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-indigo-50 hover:text-indigo-700';
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Linked records">
+      {items.slice(0, 4).map((x) => x.collectionKey
+        ? <Link key={x.id} href={`/c/${x.collectionKey}`} className={cls} title={x.title}><Link2 size={11} />{x.title}</Link>
+        : <a key={x.id} href={x.url} target="_blank" rel="noreferrer" className={cls} title={x.title}><Link2 size={11} />{x.title}</a>)}
+    </div>
+  );
+}
+
+export function RecordRow({ r, leading, dense, onEdit, related }: { r: NfRecord; leading?: React.ReactNode; dense?: boolean; onEdit?: () => void; related?: Related[] }) {
   const done = r.done === true || (r.status ? /done|complete/i.test(r.status) : false);
   const due = r.due ? formatDue(r.due, done) : null;
   return (
@@ -25,6 +38,7 @@ export function RecordRow({ r, leading, dense, onEdit }: { r: NfRecord; leading?
           </div>
         )}
         {r.progress !== null && <ProgressBar value={r.progress} className="mt-2.5" />}
+        {related && <RelatedChips items={related} />}
       </div>
       {onEdit && (
         <button onClick={onEdit} aria-label={`Edit ${r.title}`} className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
