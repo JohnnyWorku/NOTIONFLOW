@@ -47,9 +47,17 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let body: any = null;
   try { body = text ? JSON.parse(text) : null; } catch { /* non-JSON error page */ }
   if (res.status === 401 && typeof window !== 'undefined' && !['/login', '/download'].includes(window.location.pathname)) {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined); // drop the dead cookie so /login does not bounce back
     window.location.href = '/login';
   }
-  if (!res.ok) throw new ApiError(res.status, body?.message ?? `Request failed (${res.status})`, body);
+  if (!res.ok) {
+    // Nest answers "Cannot GET /api/xyz" when the deployed backend predates this feature.
+    const outdated = res.status === 404 && typeof body?.message === 'string' && body.message.startsWith('Cannot ');
+    const message = outdated
+      ? 'The backend is running an older version that lacks this feature. Redeploy/restart the backend.'
+      : body?.message ?? `Request failed (${res.status})`;
+    throw new ApiError(res.status, message, body);
+  }
   return body as T;
 }
 

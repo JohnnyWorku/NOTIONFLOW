@@ -10,7 +10,13 @@ class HealthController {
   /** Public, contains no secrets. */
   @Public() @Get()
   health() {
-    return { status: 'ok', time: new Date().toISOString(), notionConfigured: this.notion.configured };
+    return {
+      status: 'ok',
+      time: new Date().toISOString(),
+      notionConfigured: this.notion.configured,
+      version: '0.3.2',
+      commit: (process.env.RENDER_GIT_COMMIT ?? '').slice(0, 7) || null,
+    };
   }
 }
 @Module({ controllers: [HealthController] })

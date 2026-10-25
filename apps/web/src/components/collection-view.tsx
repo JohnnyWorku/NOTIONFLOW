@@ -74,7 +74,7 @@ export function CollectionView({ ckey, title, subtitle }: { ckey: string; title:
         </p>
       )}
 
-      {list.isLoading ? <Loading /> : list.isError ? <ErrorBox error={list.error} retry={() => list.refetch()} /> :
+      {list.isError ? <ErrorBox error={list.error} retry={() => list.refetch()} /> : !list.data ? <Loading /> :
         items.length === 0 ? <Empty icon={Inbox} text={overdue ? 'Nothing overdue. Nice work!' : `No ${title.toLowerCase()} found.`} /> : (
           <>
             <ul className="space-y-2.5">

@@ -67,9 +67,9 @@ export class HomeService {
         try {
           const r = await this.entities.list(c.key, { pageSize: 6 });
           return { ...base, items: r.items.slice(0, 5), hasMore: r.items.length > 5 || !!r.nextCursor };
-        } catch {
+        } catch (e: any) {
           this.log.warn(`Home: could not load "${c.key}"`);
-          return { ...base, items: [], hasMore: false, error: 'Could not load this table.' };
+          return { ...base, items: [], hasMore: false, error: e?.response?.message ?? 'Could not load this table.' };
         }
       }),
     );

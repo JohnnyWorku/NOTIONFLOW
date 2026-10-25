@@ -99,6 +99,17 @@ class DashboardScreen extends ConsumerWidget {
                     padding: EdgeInsets.only(top: 12),
                     child: AppCard(child: Row(children: [Icon(Icons.warning_amber_rounded), SizedBox(width: 12), Expanded(child: Text('Notion is not configured on the server.'))])),
                   ),
+                if (((dash.valueOrNull?['warnings'] as List?) ?? const []).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: AppCard(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('Some tables could not be loaded:', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        for (final w in (dash.value!['warnings'] as List).cast<String>()) Text('• $w'),
+                      ]),
+                    ),
+                  ),
                 if (dash.hasError) Padding(padding: const EdgeInsets.only(top: 12), child: SizedBox(height: 200, child: ErrorView(error: dash.error!, onRetry: () => ref.invalidate(dashboardProvider)))),
                 const SectionHeader('Performance'),
                 const _PerformanceCard(),

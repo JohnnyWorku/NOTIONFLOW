@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
  * Server-side proxy: the browser calls /api/proxy/*, this attaches the user's session token (from an httpOnly
  * cookie, invisible to page scripts) and forwards to NestJS. Only an allowlist of first path segments is forwarded.
  */
-const ALLOWED = new Set(['tasks', 'projects', 'goals', 'learning', 'c', 'collections', 'dashboard', 'stats', 'sync', 'notion', 'health']);
+export const maxDuration = 60; // free backends can take up to a minute to wake up
+
+const ALLOWED = new Set(['tasks', 'projects', 'goals', 'learning', 'c', 'collections', 'home', 'dashboard', 'stats', 'sync', 'notion', 'health']);
 
 async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;

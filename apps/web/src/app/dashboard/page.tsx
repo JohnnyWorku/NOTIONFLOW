@@ -13,7 +13,7 @@ import { NotionBlocks } from '@/components/notion-blocks';
 import { QuickAdd } from '@/components/quick-add';
 
 interface Dash {
-  notion: { configured: boolean }; sync: { version: number; lastWebhookAt: string | null };
+  notion: { configured: boolean }; warnings?: string[]; sync: { version: number; lastWebhookAt: string | null };
   tasks: { today: NfRecord[]; overdue: NfRecord[]; upcoming: NfRecord[] } | null;
   projects: { active: NfRecord[] } | null;
   goals: { items: NfRecord[]; averageProgress: number | null } | null;
@@ -113,9 +113,9 @@ export default function Home() {
   const home = useQuery({ queryKey: ['home'], queryFn: () => api<HomeData>('home') });
   const cols = useQuery({ queryKey: ['collections'], queryFn: () => api<Collection[]>('collections'), staleTime: 5 * 60_000 });
 
-  if (dash.isLoading) return <Loading />;
   if (dash.isError) return <ErrorBox error={dash.error} retry={() => dash.refetch()} />;
-  const d = dash.data!;
+  if (!dash.data) return <Loading />;
+  const d = dash.data;
   const n = (xs?: unknown[]) => (xs ? String(xs.length) : '—');
   const pct = (v?: number | null) => (v === null || v === undefined ? '—' : `${v}%`);
   const nothing = !d.tasks && !d.projects && !d.goals && !d.learning;
@@ -131,7 +131,13 @@ export default function Home() {
       {!d.notion.configured && (
         <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Notion is not configured on the server. See docs/notion-setup.md.</p>
       )}
-      {nothing && d.notion.configured && <Empty text="No databases configured yet. Add the NOTION_*_DB IDs to the server settings and restart/redeploy the backend." />}
+      {(d.warnings?.length ?? 0) > 0 && (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-medium">Some tables could not be loaded from Notion:</p>
+          <ul className="mt-1 list-disc pl-5">{d.warnings!.map((w) => <li key={w}>{w}</li>)}</ul>
+        </div>
+      )}
+      {nothing && d.notion.configured && (d.warnings?.length ?? 0) === 0 && <Empty text="No databases configured yet. Add the NOTION_*_DB IDs to the server settings and restart/redeploy the backend." />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Stat label="Overdue" value={n(d.tasks?.overdue)} tone="red" icon={AlertTriangle} />
@@ -153,9 +159,10 @@ export default function Home() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold text-slate-700">Your tables</h2>
-        {home.isLoading ? <Loading /> : home.isError ? <ErrorBox error={home.error} retry={() => home.refetch()} /> : (
+        {home.isError ? <ErrorBox error={home.error} retry={() => home.refetch()} /> : !home.data ? <Loading /> : (
           <div className="grid gap-6 lg:grid-cols-2">
-            {home.data!.sections.map((s) => {
+            {home.data.sections.length === 0 && <Empty text="No tables are configured on the server yet." />}
+            {home.data.sections.map((s) => {
               const Icon = iconFor(s.icon);
               return (
                 <div key={s.key} className="card space-y-3 !p-4">

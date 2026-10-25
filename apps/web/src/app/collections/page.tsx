@@ -10,9 +10,9 @@ export default function Collections() {
   return (
     <div>
       <PageHeader title="Your tables" subtitle="Every Notion database connected to NotionFlow" />
-      {q.isLoading ? <Loading /> : q.isError ? <ErrorBox error={q.error} retry={() => q.refetch()} /> : (
+      {q.isError ? <ErrorBox error={q.error} retry={() => q.refetch()} /> : !q.data ? <Loading /> : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {q.data!.map((c) => {
+          {q.data.map((c) => {
             const Icon = iconFor(c.icon);
             const body = (
               <>

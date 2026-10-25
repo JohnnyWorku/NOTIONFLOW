@@ -5,10 +5,17 @@ import { NextRequest, NextResponse } from 'next/server';
  * This only checks the cookie is present (cheap, edge-safe). The BACKEND verifies the signed token on every
  * API call, so a forged or expired cookie never yields any data.
  */
-const PUBLIC = ['/login', '/download', '/api/auth', '/api/apk-info', '/api/apk-file'];
+const PUBLIC = ['/login', '/download', '/api/auth', '/api/apk-info', '/api/apk-file', '/api/version'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Already signed in: /login goes straight to the dashboard.
+  if (pathname === '/login' && req.cookies.get('nf_session')?.value) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/dashboard';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
   if (PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
   if (req.cookies.get('nf_session')?.value) return NextResponse.next();
   if (pathname.startsWith('/api/')) return NextResponse.json({ message: 'Not signed in.' }, { status: 401 });

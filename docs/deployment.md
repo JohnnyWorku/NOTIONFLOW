@@ -186,3 +186,18 @@ set `NOTION_WEBHOOK_SECRET` on Render and redeploy. Note: on the free plan a sle
 | App: install blocked | Allow "Install unknown apps" for the browser; or the file is not the same signing key as the installed app (uninstall first). |
 | `/download` says not published | `APK_URL` not set on Vercel (or redeploy not done). |
 | Render: first request very slow | Free instance waking up. |
+
+## 12. "I pushed a fix but the site still shows the old behaviour"
+A platform only serves a new version after a **successful** build. If a build fails, the previous version keeps running, so nothing seems to change.
+
+1. Find out what is live, in one command (replace the two addresses):
+   ```bash
+   node scripts/diagnose.mjs https://<render-service>.onrender.com/api https://<project>.vercel.app
+   ```
+   It prints the backend and web versions (and commit ids) and says plainly whether either is outdated. You can also open
+   `https://<project>.vercel.app/api/version` and `https://<render-service>.onrender.com/api/health` in a browser.
+2. Compare the commit id with yours: `git rev-parse --short HEAD`. If they differ, the platform is not on your latest commit.
+3. Make sure the commit really reached GitHub: `git status` (must be clean) and `git log origin/main -1` (must match HEAD). If not: `git push`.
+4. Vercel: **Deployments** tab. A red "Error" deployment means the build failed. Open it, read the **Build Logs**, and send me the first error line.
+   Render: **Events** / **Logs** tab, same idea.
+5. Browser: hard refresh (Ctrl+Shift+R). A changed page file name in the browser console (for example `page-xxxx.js`) proves new code arrived.

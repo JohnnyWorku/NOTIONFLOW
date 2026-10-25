@@ -27,8 +27,8 @@ export default function StatsPage() {
           </div>
         }
       />
-      {q.isLoading ? <Loading /> : q.isError ? <ErrorBox error={q.error} retry={() => q.refetch()} /> : (() => {
-        const s = q.data!;
+      {q.isError ? <ErrorBox error={q.error} retry={() => q.refetch()} /> : !q.data ? <Loading /> : (() => {
+        const s = q.data;
         const t = s.tasks;
         return (
           <>

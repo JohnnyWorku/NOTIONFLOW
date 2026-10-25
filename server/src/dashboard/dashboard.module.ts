@@ -18,12 +18,19 @@ class DashboardController {
   /** Aggregates only what the data supports: missing databases yield null sections instead of fake numbers. */
   @Get()
   async get() {
-    const safe = async <T>(fn: () => Promise<T>): Promise<T | null> => { try { return await fn(); } catch { return null; } };
+    // An unset NOTION_*_DB is normal (section hidden). Any OTHER failure is reported in `warnings`, never swallowed silently.
+    const warnings: string[] = [];
+    const safe = async <T>(label: string, fn: () => Promise<T>): Promise<T | null> => {
+      try { return await fn(); } catch (e: any) {
+        if (e?.response?.code !== 'DB_NOT_CONFIGURED') warnings.push(`${label}: ${e?.response?.message ?? 'could not be loaded'}`);
+        return null;
+      }
+    };
     const [tasks, projects, goals, learning] = await Promise.all([
-      safe(() => this.e.list('tasks', { pageSize: 100 })),
-      safe(() => this.e.list('projects', { pageSize: 50 })),
-      safe(() => this.e.list('goals', { pageSize: 50 })),
-      safe(() => this.e.list('learning', { pageSize: 50 })),
+      safe('Tasks', () => this.e.list('tasks', { pageSize: 100 })),
+      safe('Projects', () => this.e.list('projects', { pageSize: 50 })),
+      safe('Goals', () => this.e.list('goals', { pageSize: 50 })),
+      safe('Learning', () => this.e.list('learning', { pageSize: 50 })),
     ]);
     const today = day(new Date());
     const open = (tasks?.items ?? []).filter((t: NfRecord) => t.done !== true && !/done|complete/i.test(t.status ?? ''));
@@ -35,6 +42,7 @@ class DashboardController {
       .sort((a, b) => b.lastEdited.localeCompare(a.lastEdited)).slice(0, 8);
     return {
       notion: { configured: this.notion.configured },
+      warnings,
       sync: this.sync.status(),
       tasks: tasks && {
         today: open.filter((t: NfRecord) => t.due?.slice(0, 10) === today),
