@@ -96,13 +96,35 @@ if (web) {
   console.log('\n6. Web app (' + web + ')');
   try {
     const v = await fetch(`${web}/api/version`, { signal: AbortSignal.timeout(30_000) });
-    if (v.ok) { const j = await v.json(); ok(`web version v${j.version}${j.commit ? ` (commit ${j.commit})` : ''}, environment ${j.environment}`); if (!j.apiBaseConfigured) bad('API_BASE_URL is NOT set on the web app'); }
-    else bad(`/api/version returned ${v.status}: the web app is older than 0.3.2 (this route does not exist yet) → it has not been redeployed`);
-    const p = await fetch(`${web}/api/proxy/home`, { signal: AbortSignal.timeout(30_000) });
-    const t = await p.text();
-    if (p.status === 401) ok('web proxy knows the /home route');
-    else if (p.status === 404) bad('web proxy returns 404 for /home → the web app is running OLD code. Redeploy the web app (check Vercel → Deployments for a failed build).');
-    else info(`proxy /home answered ${p.status}`);
+    if (v.ok) {
+      const j = await v.json();
+      ok(`web version v${j.version}${j.commit ? ` (commit ${j.commit})` : ''}, environment ${j.environment}`);
+      if (!j.apiBaseConfigured) bad('API_BASE_URL is NOT set on the web app');
+    } else {
+      bad(`/api/version returned ${v.status} → the web app is OLDER than 0.3.2 (it has not been redeployed with your latest commit)`);
+    }
+    // Sign in through the web app exactly like a browser, then call the routes the pages use.
+    const wl = await fetch(`${web}/api/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: pw }), signal: AbortSignal.timeout(90_000),
+    });
+    if (!wl.ok) {
+      const t = await wl.text();
+      bad(`web sign-in failed (${wl.status}): ${t.slice(0, 140)}`);
+      info('If this says "Cannot POST /auth/login", API_BASE_URL on the web app is missing the trailing /api.');
+    } else {
+      const raw = wl.headers.getSetCookie ? wl.headers.getSetCookie() : [wl.headers.get('set-cookie') ?? ''];
+      const cookie = raw.map((c) => c.split(';')[0]).filter(Boolean).join('; ');
+      if (!cookie) bad('web sign-in worked but sent no session cookie');
+      else {
+        ok('web sign-in works');
+        for (const route of ['health', 'collections', 'dashboard', 'home', 'stats']) {
+          const r = await fetch(`${web}/api/proxy/${route}`, { headers: { cookie }, signal: AbortSignal.timeout(90_000) });
+          if (r.status === 200) ok(`web → backend /${route}: 200`);
+          else if (r.status === 404) bad(`web → backend /${route}: 404 → the web app is running OLD code (its proxy does not allow "${route}")`);
+          else bad(`web → backend /${route}: ${r.status} ${(await r.text()).slice(0, 100)}`);
+        }
+      }
+    }
   } catch (e) { bad(`cannot reach the web app: ${e.message}`); }
 }
 console.log('\nDone. Send me this output if something is still wrong.\n');
