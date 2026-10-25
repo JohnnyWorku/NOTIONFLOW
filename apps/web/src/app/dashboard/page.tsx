@@ -90,17 +90,17 @@ function Performance() {
   );
 }
 
-function NotionHome({ page }: { page: NonNullable<HomeData['page']> }) {
+function NotionHome({ page, related }: { page: NonNullable<HomeData['page']>; related: Record<string, Related> }) {
   return (
     <section className="card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="font-semibold">{page.title}</h2>
         {page.url && <a href={page.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline">Open in Notion <ExternalLink size={13} /></a>}
       </div>
-      {page.error ? <p role="alert" className="text-sm text-amber-800">{page.error}</p> : <NotionBlocks blocks={page.blocks} />}
+      {page.error ? <p role="alert" className="text-sm text-amber-800">{page.error}</p> : <NotionBlocks blocks={page.blocks} related={related} />}
       {(page.skipped > 0 || page.truncated) && (
         <p className="mt-3 text-[11px] text-slate-400">
-          {page.skipped > 0 && `${page.skipped} block${page.skipped === 1 ? '' : 's'} (images, linked database views, embeds…) can’t be shown here. `}
+          {page.skipped > 0 && `${page.skipped} block${page.skipped === 1 ? '' : 's'} (images, embeds…) can’t be shown here. `}
           {page.truncated && 'Showing the first part of a long page.'}
         </p>
       )}
@@ -110,7 +110,7 @@ function NotionHome({ page }: { page: NonNullable<HomeData['page']> }) {
 
 export default function Home() {
   const dash = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dash>('dashboard') });
-  const home = useQuery({ queryKey: ['home'], queryFn: () => api<HomeData>('home') });
+  const home = useQuery({ queryKey: ['home'], queryFn: () => api<HomeData>(`home?tz=${-new Date().getTimezoneOffset()}`) });
   const cols = useQuery({ queryKey: ['collections'], queryFn: () => api<Collection[]>('collections'), staleTime: 5 * 60_000 });
 
   if (dash.isError) return <ErrorBox error={dash.error} retry={() => dash.refetch()} />;
@@ -120,6 +120,11 @@ export default function Home() {
   const pct = (v?: number | null) => (v === null || v === undefined ? '—' : `${v}%`);
   const nothing = !d.tasks && !d.projects && !d.goals && !d.learning;
   const relatedFor = (r: NfRecord): Related[] => (r.relatedIds ?? []).map((id) => home.data?.related[id]).filter((x): x is Related => !!x);
+  // When your Notion home page is mirrored with live views, it IS the main body: no duplicate Today/tables sections.
+  const page = home.data?.page ?? null;
+  const mirrored = !!page && !page.error && page.blocks.length > 0;
+  const used = new Set(page?.used ?? []);
+  const otherSections = (home.data?.sections ?? []).filter((s) => !used.has(s.key));
 
   return (
     <div className="space-y-8">
@@ -150,19 +155,24 @@ export default function Home() {
 
       <Performance />
 
-      {home.data?.page && <NotionHome page={home.data.page} />}
+      {page && <NotionHome page={page} related={home.data?.related ?? {}} />}
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <Focus title="Overdue" items={d.tasks?.overdue} empty="Nothing overdue. 🎉" />
-        <Focus title="Today" items={d.tasks?.today} empty="No tasks due today." />
-      </div>
+      {mirrored ? (
+        (d.tasks?.overdue.length ?? 0) > 0 && <Focus title="Overdue" items={d.tasks?.overdue} empty="Nothing overdue. 🎉" />
+      ) : (
+        <div className="grid gap-8 lg:grid-cols-2">
+          <Focus title="Overdue" items={d.tasks?.overdue} empty="Nothing overdue. 🎉" />
+          <Focus title="Today" items={d.tasks?.today} empty="No tasks due today." />
+        </div>
+      )}
 
+      {(!mirrored || otherSections.length > 0) && (
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Your tables</h2>
+        <h2 className="mb-3 text-sm font-semibold text-slate-700">{mirrored ? 'Other tables' : 'Your tables'}</h2>
         {home.isError ? <ErrorBox error={home.error} retry={() => home.refetch()} /> : !home.data ? <Loading /> : (
           <div className="grid gap-6 lg:grid-cols-2">
             {home.data.sections.length === 0 && <Empty text="No tables are configured on the server yet." />}
-            {home.data.sections.map((s) => {
+            {(mirrored ? otherSections : home.data.sections).map((s) => {
               const Icon = iconFor(s.icon);
               return (
                 <div key={s.key} className="card space-y-3 !p-4">
@@ -179,6 +189,7 @@ export default function Home() {
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }

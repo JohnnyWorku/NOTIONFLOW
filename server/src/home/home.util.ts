@@ -6,6 +6,8 @@ export type BlockType =
 export interface Block {
   id: string; type: BlockType; level?: 1 | 2 | 3; text?: Seg[]; checked?: boolean; icon?: string;
   title?: string; url?: string; collectionKey?: string; children?: Block[];
+  /** Set on database blocks when the server resolved the view to a table: live records for it. */
+  items?: unknown[]; hasMore?: boolean; heading?: string; preset?: Preset;
 }
 export type Matcher = (q: { id?: string; title?: string }) => string | undefined;
 
@@ -52,8 +54,10 @@ export function convertBlock(b: any, match: Matcher): Block | null {
     case 'toggle': return { id, type: 'toggle', text: toSegments(v.rich_text) };
     case 'column_list': return { id, type: 'columns' };
     case 'column': return { id, type: 'column' };
-    case 'child_database':
-      return { id, type: 'database', title: v.title, url: notionUrl(id), collectionKey: match({ id, title: v.title }) };
+    case 'child_database': {
+      const title = typeof v.title === 'string' && v.title.trim() && v.title.trim().toLowerCase() !== 'untitled' ? v.title : undefined;
+      return { id, type: 'database', title, url: notionUrl(id), collectionKey: match({ id, title }) };
+    }
     case 'child_page':
       return { id, type: 'page', title: v.title, url: notionUrl(id) };
     case 'link_to_page': {
@@ -68,5 +72,67 @@ export function convertBlock(b: any, match: Matcher): Block | null {
     }
     default:
       return null;
+  }
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Heading -> live view. Notion's API cannot describe a database *view* placed on a page (its filter,
+// its name), so we read the intent from the heading above it: "Today's Tasks", "Active Projects"...
+// ---------------------------------------------------------------------------------------------
+export type Preset = 'all' | 'today' | 'week' | 'overdue' | 'open' | 'upcoming';
+
+const strip = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export function inferPreset(heading: string): Preset {
+  const t = strip(heading);
+  if (/\b(overdue|late)\b/.test(t)) return 'overdue';
+  if (/\btoday\b/.test(t)) return 'today';
+  if (/\bweek\b/.test(t)) return 'week';
+  if (/\b(upcoming|next)\b/.test(t)) return 'upcoming';
+  if (/\b(active|open|current|ongoing)\b|in progress/.test(t)) return 'open';
+  return 'all';
+}
+
+const KEYWORDS: [RegExp, string][] = [
+  [/\b(tasks?|to ?dos?)\b/, 'tasks'],
+  [/\bprojects?\b/, 'projects'],
+  [/\bgoals?\b/, 'goals'],
+  [/\b(learn(ing)?|study|courses?)\b/, 'learning'],
+];
+
+export function inferView(heading: string, cols: { key: string; label: string }[]): { collectionKey: string; preset: Preset } | null {
+  const t = strip(heading);
+  if (!t) return null;
+  const preset = inferPreset(heading);
+  // 1) a configured table named in the heading (longest label first, so "Reading list" beats "List")
+  const named = [...cols].sort((a, b) => b.label.length - a.label.length).find((c) => {
+    const l = strip(c.label);
+    return (l && new RegExp(`\\b${esc(l)}\\b`).test(t)) || t === c.key;
+  });
+  if (named) return { collectionKey: named.key, preset };
+  // 2) common words for the built-in tables
+  for (const [re, key] of KEYWORDS) if (re.test(t) && cols.some((c) => c.key === key)) return { collectionKey: key, preset };
+  // 3) "Today", "This week", "Overdue", "Upcoming" on their own mean tasks
+  if (preset !== 'all' && preset !== 'open' && cols.some((c) => c.key === 'tasks')) return { collectionKey: 'tasks', preset };
+  return null;
+}
+
+export const addDays = (ymd: string, n: number): string => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+/** Translate a preset into list filters. Weeks run Monday to Sunday. */
+export function presetFilters(preset: Preset, today: string): { dueFrom?: string; dueTo?: string; open?: boolean; overdue?: boolean } {
+  switch (preset) {
+    case 'today': return { dueFrom: today, dueTo: today };
+    case 'week': {
+      const dow = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7; // Monday = 0
+      const monday = addDays(today, -dow);
+      return { dueFrom: monday, dueTo: addDays(monday, 6) };
+    }
+    case 'overdue': return { overdue: true };
+    case 'upcoming': return { dueFrom: addDays(today, 1), open: true };
+    case 'open': return { open: true };
+    default: return {};
   }
 }

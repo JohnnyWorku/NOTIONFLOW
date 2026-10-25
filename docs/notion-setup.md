@@ -14,6 +14,20 @@
    - Open the page in Notion → `···` → **Connections** → add your integration (a page must be shared separately from its databases).
    - Copy its link (`···` → Copy link). The ID is the last 32 letters/digits of the URL (before any `?`), for example `https://www.notion.so/Home-0123456789abcdef0123456789abcdef` → `0123456789abcdef0123456789abcdef`.
    - Set `NOTION_HOME_PAGE_ID=<that id>` in `server/.env` (or on Render) and restart/redeploy.
-   - Shown: headings, text, lists, to-dos, callouts, quotes, toggles, columns, bookmarks, and links to pages. **Inline databases** whose ID or title matches one of your connected tables become buttons that open that table inside NotionFlow.
-   - Not shown (Notion's API does not provide them): images, embeds, and **linked database views** (a database view placed on the page that lives elsewhere). They are counted in a small "N blocks can't be shown" note. Your connected tables still appear in the "Your tables" section of Home.
+   - Shown: headings, text, lists, to-dos, callouts, quotes, toggles, columns, bookmarks, and links to pages.
+   - **Database views on the page** (a table placed under a heading): Notion's API cannot say what such a view shows, so NotionFlow reads the intent from the **heading above it** and fills the spot with live records from your own tables:
+
+     | Heading contains… | Shows |
+     |---|---|
+     | a table's name (Tasks, Projects, Goals, Learning, or any custom table's label such as Spiritual) | that table |
+     | *Today* | records dated today |
+     | *This week* / *Week* | records dated Monday to Sunday of this week |
+     | *Overdue* | past-due, not done |
+     | *Upcoming* / *Next* | dated after today, not done |
+     | *Active / Open / Current / Ongoing* | not done |
+
+     Examples: "📌 Today's Tasks" → tasks due today · "📈 Active Projects" → projects not done · "📚 Learning" → the learning table · "📅 This Week" (no table named) → tasks due this week.
+   - If a heading matches nothing, that view shows as a link "Open “<heading>” in Notion". Rename the heading (for example add the table's name) to make it live.
+   - Tables already shown by the page are not repeated below it; any other table appears under "Other tables". Overdue tasks always stay visible.
+   - Not shown (Notion's API does not provide them): images and embeds. They are counted in a small note.
    - Even without this setting, Home shows a card for every connected table, with the records they link to through Notion relations.

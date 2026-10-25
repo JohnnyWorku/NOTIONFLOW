@@ -21,11 +21,16 @@ class Block {
   final int level;
   final List<Seg> text;
   final bool checked;
-  final String? icon, title, url, collectionKey;
+  final String? icon, title, url, collectionKey, heading, preset;
   final List<Block> children;
+
+  /// Live records for a database view the server resolved from the heading above it (null = not resolved).
+  final List<NfRecord>? items;
+  final bool hasMore;
   const Block({
     required this.id, required this.type, this.level = 0, this.text = const [], this.checked = false,
     this.icon, this.title, this.url, this.collectionKey, this.children = const [],
+    this.items, this.hasMore = false, this.heading, this.preset,
   });
   factory Block.fromJson(Map<String, dynamic> j) => Block(
         id: j['id'] as String,
@@ -38,6 +43,10 @@ class Block {
         url: j['url'] as String?,
         collectionKey: j['collectionKey'] as String?,
         children: ((j['children'] as List?) ?? const []).map((e) => Block.fromJson(e as Map<String, dynamic>)).toList(),
+        items: j['items'] == null ? null : (j['items'] as List).map((e) => NfRecord.fromJson(e as Map<String, dynamic>)).toList(),
+        hasMore: j['hasMore'] == true,
+        heading: j['heading'] as String?,
+        preset: j['preset'] as String?,
       );
 }
 
@@ -45,14 +54,16 @@ class HomePage {
   final String title;
   final String? url, error;
   final List<Block> blocks;
+  final List<String> used; // table keys already shown by live views on the page
   final int skipped;
   final bool truncated;
-  const HomePage({required this.title, this.url, this.error, this.blocks = const [], this.skipped = 0, this.truncated = false});
+  const HomePage({required this.title, this.url, this.error, this.blocks = const [], this.used = const [], this.skipped = 0, this.truncated = false});
   factory HomePage.fromJson(Map<String, dynamic> j) => HomePage(
         title: (j['title'] ?? 'Home') as String,
         url: j['url'] as String?,
         error: j['error'] as String?,
         blocks: ((j['blocks'] as List?) ?? const []).map((e) => Block.fromJson(e as Map<String, dynamic>)).toList(),
+        used: ((j['used'] as List?) ?? const []).cast<String>(),
         skipped: (j['skipped'] as num?)?.toInt() ?? 0,
         truncated: j['truncated'] == true,
       );

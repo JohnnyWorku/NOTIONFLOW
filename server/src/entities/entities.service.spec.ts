@@ -52,4 +52,26 @@ describe('EntitiesService', () => {
     notion.getPage.mockResolvedValue({ ...page('2026-01-01T00:00:00.000Z'), parent: { database_id: 'OTHER' } });
     await expect(svc.update('tasks', 'p1', { expectedLastEdited: '2026-01-01T00:00:00.000Z', title: 'x' })).rejects.toThrow();
   });
+  it('builds date-range and open filters for checkbox tasks', async () => {
+    const { svc, notion } = setup();
+    notion.resolve.mockResolvedValue({ id: 'DB', dataSourceMode: false, title: 't', properties: { Name: { type: 'title' }, Due: { type: 'date' }, Done: { type: 'checkbox' } } });
+    await svc.list('tasks', { dueFrom: '2026-10-19', dueTo: '2026-10-25', open: true });
+    expect(notion.query.mock.calls[0][1].filter.and).toEqual([
+      { property: 'Due', date: { on_or_after: '2026-10-19' } },
+      { property: 'Due', date: { on_or_before: '2026-10-25' } },
+      { property: 'Done', checkbox: { equals: false } },
+    ]);
+  });
+  it('excludes every done-like status option when there is no checkbox', async () => {
+    const { svc, notion } = setup();
+    notion.resolve.mockResolvedValue({
+      id: 'DB', dataSourceMode: false, title: 't',
+      properties: { Name: { type: 'title' }, Status: { type: 'status', status: { options: [{ name: 'Todo' }, { name: 'Done' }, { name: 'Completed' }] } } },
+    });
+    await svc.list('tasks', { open: true });
+    expect(notion.query.mock.calls[0][1].filter.and).toEqual([
+      { property: 'Status', status: { does_not_equal: 'Done' } },
+      { property: 'Status', status: { does_not_equal: 'Completed' } },
+    ]);
+  });
 });

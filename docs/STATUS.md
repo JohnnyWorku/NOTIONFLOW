@@ -23,6 +23,11 @@ Notion-driven Status/Priority dropdowns, edit + delete + load-more on web and mo
 - Mobile redesign: new theme with dark mode, card-based lists, status/priority/due chips, skeleton loading, gradient Home header, restyled login/tables/stats/settings.
 - Executed here: block conversion logic (Node script). Not executed: Nest wiring, web build, Flutter analyze/test.
 
+## 0.3.3 changes
+- Home mirrors your Notion home page with LIVE lists: each database view takes its meaning from the heading above it (docs/notion-setup.md step 8), instead of an empty "Untitled" link.
+- Home no longer repeats the same data: mirrored page = main body; only overdue tasks and tables not on the page appear below.
+- Executed here: heading→table/preset inference and date-range maths (Node script). Not executed: Nest wiring, web build, Flutter analyze/test.
+
 ## Known limits
 - Task completion day is estimated from last edit (Notion stores no completion time).
 - Statistics read up to 300 records per table.

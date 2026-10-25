@@ -59,6 +59,19 @@ export class EntitiesService {
       and.push({ property: fields.due, date: { before: new Date().toISOString().slice(0, 10) } });
       if (fields.done) and.push({ property: fields.done, checkbox: { equals: false } });
     }
+    if (q.dueFrom && fields.due) and.push({ property: fields.due, date: { on_or_after: q.dueFrom } });
+    if (q.dueTo && fields.due) and.push({ property: fields.due, date: { on_or_before: q.dueTo } });
+    if (q.open) {
+      if (fields.done) {
+        and.push({ property: fields.done, checkbox: { equals: false } });
+      } else if (fields.status) {
+        const prop = src.properties[fields.status];
+        const doneNames = ((prop.status?.options ?? prop.select?.options ?? []) as any[])
+          .map((o) => o.name as string)
+          .filter((n) => /done|complete|finish|archiv/i.test(n));
+        for (const name of doneNames) and.push({ property: fields.status, [prop.type]: { does_not_equal: name } });
+      }
+    }
     const res = await this.notion.query(src, {
       filter: and.length ? { and } : undefined,
       sorts: fields.due ? [{ property: fields.due, direction: fields.done ? 'ascending' : 'descending' }] : [{ timestamp: 'last_edited_time', direction: 'descending' }],

@@ -28,3 +28,34 @@ describe('home blocks', () => {
     expect(convertBlock({ id: 'l2', type: 'link_to_page', link_to_page: { type: 'database_id', database_id: 'db-1' } }, match)).toMatchObject({ type: 'database', collectionKey: 'tasks' });
   });
 });
+
+import { inferPreset, inferView, presetFilters } from './home.util';
+
+describe('heading → live view', () => {
+  const cols = [
+    { key: 'tasks', label: 'Tasks' }, { key: 'projects', label: 'Projects' }, { key: 'goals', label: 'Goals' },
+    { key: 'learning', label: 'Learning' }, { key: 'spiritual', label: 'Spiritual' },
+  ];
+  it('reads the filter intent from the heading', () => {
+    expect(inferPreset("📌 Today's Tasks")).toBe('today');
+    expect(inferPreset('📅 This Week')).toBe('week');
+    expect(inferPreset('📈 Active Projects')).toBe('open');
+    expect(inferPreset('Learning')).toBe('all');
+  });
+  it('maps headings to tables', () => {
+    expect(inferView("📌 Today's Tasks", cols)).toEqual({ collectionKey: 'tasks', preset: 'today' });
+    expect(inferView('📈 Active Projects', cols)).toEqual({ collectionKey: 'projects', preset: 'open' });
+    expect(inferView('📚 Learning', cols)).toEqual({ collectionKey: 'learning', preset: 'all' });
+    expect(inferView('Spiritual', cols)).toEqual({ collectionKey: 'spiritual', preset: 'all' });
+    expect(inferView('📅 This Week', cols)).toEqual({ collectionKey: 'tasks', preset: 'week' });
+  });
+  it('gives up when nothing matches', () => {
+    expect(inferView('Random thoughts', cols)).toBeNull();
+    expect(inferView('', cols)).toBeNull();
+  });
+  it('builds date filters (weeks run Monday to Sunday)', () => {
+    expect(presetFilters('today', '2026-10-22')).toEqual({ dueFrom: '2026-10-22', dueTo: '2026-10-22' });
+    expect(presetFilters('week', '2026-10-22')).toEqual({ dueFrom: '2026-10-19', dueTo: '2026-10-25' }); // Thursday
+    expect(presetFilters('upcoming', '2026-10-22')).toEqual({ dueFrom: '2026-10-23', open: true });
+  });
+});

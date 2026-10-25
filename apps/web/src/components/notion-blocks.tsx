@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ExternalLink, FileText, Table2 } from 'lucide-react';
-import type { Block, Seg } from '@/lib/api';
+import type { Block, NfRecord, Related, Seg } from '@/lib/api';
+import { RecordRow } from './records';
 
 function Rich({ segs }: { segs?: Seg[] }) {
   return (
@@ -18,8 +19,31 @@ function Rich({ segs }: { segs?: Seg[] }) {
   );
 }
 
+const EMPTY: Record<string, string> = { today: 'Nothing due today.', week: 'Nothing due this week.', overdue: 'Nothing overdue.', upcoming: 'Nothing upcoming.', open: 'Nothing open.' };
+
+/** A database view from your Notion page, filled with live records from the matching table. */
+function LiveView({ b, related }: { b: Block; related: Record<string, Related> }) {
+  const items: NfRecord[] = b.items ?? [];
+  return (
+    <div className="space-y-2">
+      {items.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-center text-sm text-slate-500">{EMPTY[b.preset ?? ''] ?? 'Nothing here yet.'}</p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((r) => (
+            <RecordRow key={r.id} r={r} dense related={(r.relatedIds ?? []).map((id) => related[id]).filter((x): x is Related => !!x)} />
+          ))}
+        </ul>
+      )}
+      {b.collectionKey && (
+        <Link href={`/c/${b.collectionKey}`} className="inline-block text-xs font-medium text-indigo-600 hover:underline">{b.hasMore ? 'View all →' : 'Open table →'}</Link>
+      )}
+    </div>
+  );
+}
+
 function Tile({ b }: { b: Block }) {
-  const label = b.title ?? (b.collectionKey ? 'Open table' : 'Open in Notion');
+  const label = b.title ?? (b.heading ? `Open “${b.heading.trim()}” in Notion` : b.collectionKey ? 'Open table' : 'Open in Notion');
   const inner = (
     <>
       {b.type === 'database' ? <Table2 size={16} className="text-indigo-600" /> : <FileText size={16} className="text-slate-500" />}
@@ -33,8 +57,8 @@ function Tile({ b }: { b: Block }) {
     : <a href={b.url} target="_blank" rel="noreferrer" className={cls}>{inner}</a>;
 }
 
-function One({ b, n }: { b: Block; n: number }) {
-  const kids = b.children?.length ? <div className="ml-5 mt-1"><NotionBlocks blocks={b.children} /></div> : null;
+function One({ b, n, related }: { b: Block; n: number; related: Record<string, Related> }) {
+  const kids = b.children?.length ? <div className="ml-5 mt-1"><NotionBlocks blocks={b.children} related={related} /></div> : null;
   switch (b.type) {
     case 'heading': {
       const cls = b.level === 1 ? 'text-xl font-semibold' : b.level === 2 ? 'text-lg font-semibold' : 'font-semibold';
@@ -62,23 +86,24 @@ function One({ b, n }: { b: Block; n: number }) {
     );
     case 'columns': return (
       <div className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
-        {(b.children ?? []).map((c) => <div key={c.id} className="min-w-0"><NotionBlocks blocks={c.children ?? []} /></div>)}
+        {(b.children ?? []).map((c) => <div key={c.id} className="min-w-0"><NotionBlocks blocks={c.children ?? []} related={related} /></div>)}
       </div>
     );
-    case 'column': return <NotionBlocks blocks={b.children ?? []} />;
-    case 'database': case 'page': case 'link': return <Tile b={b} />;
+    case 'column': return <NotionBlocks blocks={b.children ?? []} related={related} />;
+    case 'database': return b.items ? <LiveView b={b} related={related} /> : <Tile b={b} />;
+    case 'page': case 'link': return <Tile b={b} />;
     default: return null;
   }
 }
 
 /** Renders a simplified mirror of a Notion page. Read-only by design. */
-export function NotionBlocks({ blocks }: { blocks: Block[] }) {
+export function NotionBlocks({ blocks, related = {} }: { blocks: Block[]; related?: Record<string, Related> }) {
   let n = 0;
   return (
     <div className="space-y-2">
       {blocks.map((b) => {
         n = b.type === 'number' ? n + 1 : 0;
-        return <One key={b.id} b={b} n={n} />;
+        return <One key={b.id} b={b} n={n} related={related} />;
       })}
     </div>
   );

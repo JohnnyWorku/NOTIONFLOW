@@ -71,6 +71,10 @@ class DashboardScreen extends ConsumerWidget {
     final overdue = tasks == null ? <NfRecord>[] : _recs(tasks['overdue']);
     final today = tasks == null ? <NfRecord>[] : _recs(tasks['today']);
     final upcoming = tasks == null ? <NfRecord>[] : _recs(tasks['upcoming']);
+    // When the Notion home page is mirrored with live views, it IS the main body: no duplicate Today / tables sections.
+    final page = home.valueOrNull?.page;
+    final mirrored = page != null && page.error == null && page.blocks.isNotEmpty;
+    final others = [for (final s in home.valueOrNull?.sections ?? const <HomeSection>[]) if (!(page?.used.contains(s.key) ?? false)) s];
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(onPressed: () => _quickAdd(context, ref), icon: const Icon(Icons.add), label: const Text('Quick add')),
@@ -113,16 +117,16 @@ class DashboardScreen extends ConsumerWidget {
                 if (dash.hasError) Padding(padding: const EdgeInsets.only(top: 12), child: SizedBox(height: 200, child: ErrorView(error: dash.error!, onRetry: () => ref.invalidate(dashboardProvider)))),
                 const SectionHeader('Performance'),
                 const _PerformanceCard(),
-                if (home.valueOrNull?.page != null) ...[
-                  SectionHeader(home.value!.page!.title),
+                if (page != null) ...[
+                  SectionHeader(page.title),
                   AppCard(
-                    child: home.value!.page!.error != null
-                        ? Text(home.value!.page!.error!)
+                    child: page.error != null
+                        ? Text(page.error!)
                         : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            NotionBlocksView(blocks: home.value!.page!.blocks, onOpen: (b) => _openBlock(context, b)),
-                            if (home.value!.page!.skipped > 0 || home.value!.page!.truncated)
+                            NotionBlocksView(blocks: page.blocks, related: home.value!.related, onOpen: (b) => _openBlock(context, b)),
+                            if (page.skipped > 0 || page.truncated)
                               Text(
-                                '${home.value!.page!.skipped > 0 ? '${home.value!.page!.skipped} block(s) (images, linked database views, embeds) can’t be shown here. ' : ''}${home.value!.page!.truncated ? 'Showing the first part of a long page.' : ''}',
+                                '${page.skipped > 0 ? '${page.skipped} block(s) (images, embeds) can’t be shown here. ' : ''}${page.truncated ? 'Showing the first part of a long page.' : ''}',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                           ]),
@@ -132,20 +136,24 @@ class DashboardScreen extends ConsumerWidget {
                   SectionHeader('Overdue', count: overdue.length),
                   for (final r in overdue.take(5)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r)),
                 ],
-                SectionHeader('Today', count: today.length),
-                if (today.isEmpty)
-                  const AppCard(child: Text('No tasks due today.'))
-                else
-                  for (final r in today.take(6)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r)),
-                if (upcoming.isNotEmpty) ...[
-                  SectionHeader('Upcoming', count: upcoming.length),
-                  for (final r in upcoming.take(4)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r)),
+                if (!mirrored) ...[
+                  SectionHeader('Today', count: today.length),
+                  if (today.isEmpty)
+                    const AppCard(child: Text('No tasks due today.'))
+                  else
+                    for (final r in today.take(6)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r)),
+                  if (upcoming.isNotEmpty) ...[
+                    SectionHeader('Upcoming', count: upcoming.length),
+                    for (final r in upcoming.take(4)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r)),
+                  ],
                 ],
-                const SectionHeader('Your tables'),
+                if (!mirrored || others.isNotEmpty) SectionHeader(mirrored ? 'Other tables' : 'Your tables'),
                 home.when(
                   loading: () => const SkeletonList(count: 3, itemHeight: 140),
                   error: (e, _) => SizedBox(height: 200, child: ErrorView(error: e, onRetry: () => ref.invalidate(homeProvider))),
-                  data: (h) => Column(children: [for (final s in h.sections) Padding(padding: const EdgeInsets.only(bottom: 12), child: _TableCard(section: s, data: h))]),
+                  data: (h) => Column(children: [
+                    for (final s in (mirrored ? others : h.sections)) Padding(padding: const EdgeInsets.only(bottom: 12), child: _TableCard(section: s, data: h)),
+                  ]),
                 ),
               ]),
             ),

@@ -33,4 +33,8 @@ export class ListQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
   @ApiPropertyOptional({ description: 'only not-done records with due date before today' })
   @IsOptional() @Transform(({ value }) => value === 'true' || value === true) @IsBoolean() overdue?: boolean;
+  @ApiPropertyOptional({ description: 'date on or after (YYYY-MM-DD)' }) @IsOptional() @IsISO8601() dueFrom?: string;
+  @ApiPropertyOptional({ description: 'date on or before (YYYY-MM-DD)' }) @IsOptional() @IsISO8601() dueTo?: string;
+  @ApiPropertyOptional({ description: 'exclude done / completed records' })
+  @IsOptional() @Transform(({ value }) => value === 'true' || value === true) @IsBoolean() open?: boolean;
 }

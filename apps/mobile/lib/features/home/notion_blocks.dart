@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../core/widgets/app_card.dart';
+import '../../core/widgets/record_card.dart';
+import '../tasks/record.dart';
 import 'home_models.dart';
 
 /// Read-only rendering of a mirrored Notion page.
 class NotionBlocksView extends StatelessWidget {
   final List<Block> blocks;
   final void Function(Block) onOpen;
-  const NotionBlocksView({super.key, required this.blocks, required this.onOpen});
+  final Map<String, RelatedInfo> related;
+  const NotionBlocksView({super.key, required this.blocks, required this.onOpen, this.related = const {}});
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +43,36 @@ class NotionBlocksView extends StatelessWidget {
   }
 
   Widget _nested(Block b) =>
-      b.children.isEmpty ? const SizedBox.shrink() : Padding(padding: const EdgeInsets.only(left: 18, top: 6), child: NotionBlocksView(blocks: b.children, onOpen: onOpen));
+      b.children.isEmpty ? const SizedBox.shrink() : Padding(padding: const EdgeInsets.only(left: 18, top: 6), child: NotionBlocksView(blocks: b.children, onOpen: onOpen, related: related));
+
+  static const _empty = {
+    'today': 'Nothing due today.',
+    'week': 'Nothing due this week.',
+    'overdue': 'Nothing overdue.',
+    'upcoming': 'Nothing upcoming.',
+    'open': 'Nothing open.',
+  };
+
+  /// A database view from the Notion page, filled with live records from the matching table.
+  Widget _live(BuildContext context, Block b) {
+    final cs = Theme.of(context).colorScheme;
+    final items = b.items!;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (items.isEmpty)
+        Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(_empty[b.preset] ?? 'Nothing here yet.', style: TextStyle(color: cs.onSurfaceVariant)))
+      else
+        for (final r in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: RecordCard(r, flat: true, related: [for (final id in r.relatedIds) if (related[id] != null) related[id]!]),
+          ),
+      if (b.collectionKey != null) TextButton(onPressed: () => onOpen(b), child: Text(b.hasMore ? 'View all' : 'Open table')),
+    ]);
+  }
 
   Widget _tile(BuildContext context, Block b) {
     final cs = Theme.of(context).colorScheme;
-    final label = b.title ?? (b.collectionKey != null ? 'Open table' : 'Open in Notion');
+    final label = b.title ?? (b.heading != null && b.heading!.trim().isNotEmpty ? 'Open “${b.heading!.trim()}” in Notion' : (b.collectionKey != null ? 'Open table' : 'Open in Notion'));
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       onTap: () => onOpen(b),
@@ -114,16 +142,17 @@ class NotionBlocksView extends StatelessWidget {
             tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.only(left: 12),
             title: Text.rich(_span(context, b.text, base: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600))),
-            children: [NotionBlocksView(blocks: b.children, onOpen: onOpen)],
+            children: [NotionBlocksView(blocks: b.children, onOpen: onOpen, related: related)],
           ),
         );
       case 'columns':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (final c in b.children) NotionBlocksView(blocks: c.children, onOpen: onOpen),
+          for (final c in b.children) NotionBlocksView(blocks: c.children, onOpen: onOpen, related: related),
         ]);
       case 'column':
-        return NotionBlocksView(blocks: b.children, onOpen: onOpen);
+        return NotionBlocksView(blocks: b.children, onOpen: onOpen, related: related);
       case 'database':
+        return b.items != null ? _live(context, b) : _tile(context, b);
       case 'page':
       case 'link':
         return _tile(context, b);

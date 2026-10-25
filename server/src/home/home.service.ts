@@ -5,7 +5,8 @@ import { EntitiesService } from '../entities/entities.service';
 import { NfRecord } from '../entities/mapping';
 import { NotionService } from '../notion/notion.service';
 import { SyncService } from '../sync/sync.service';
-import { Block, HAS_CHILDREN, convertBlock, isEmptyParagraph } from './home.util';
+import { lastNDays } from '../stats/stats.util';
+import { Block, HAS_CHILDREN, convertBlock, inferView, isEmptyParagraph, presetFilters } from './home.util';
 
 export interface RelatedInfo { id: string; title: string; status: string | null; url: string; collectionKey?: string }
 interface Section { key: string; label: string; icon?: string; builtin: boolean; items: NfRecord[]; hasMore: boolean; error?: string }
@@ -24,7 +25,7 @@ const MAX_BLOCKS = 150;
 @Injectable()
 export class HomeService {
   private readonly log = new Logger(HomeService.name);
-  private cache: { at: number; version: number; data: unknown } | null = null;
+  private cache = new Map<number, { at: number; version: number; data: unknown }>();
   private relatedCache = new Map<string, { at: number; info: RelatedInfo | null }>();
 
   constructor(
@@ -45,18 +46,55 @@ export class HomeService {
     return title ? all.find((c) => c.databaseId && c.label.toLowerCase() === title)?.key : undefined;
   };
 
-  async get() {
+  /** tz = minutes east of UTC, so "today" and "this week" match the viewer's calendar. */
+  async get(tz = 0) {
     const version = this.sync.status().version;
-    if (this.cache && this.cache.version === version && Date.now() - this.cache.at < 60_000) return this.cache.data;
+    const hit = this.cache.get(tz);
+    if (hit && hit.version === version && Date.now() - hit.at < 60_000) return hit.data;
 
     const sections = await this.loadSections(); // first: resolves schemas so block matching can use source ids
-    const page = await this.loadPage();
-    const ids = [...new Set(sections.flatMap((s) => s.items.flatMap((i) => i.relatedIds)))].slice(0, 40);
+    const page = await this.loadPage(tz);
+    const records = [...sections.flatMap((s) => s.items), ...this.viewItems(page?.blocks ?? [])];
+    const ids = [...new Set(records.flatMap((i) => i.relatedIds))].slice(0, 40);
     const related = await this.resolveRelated(ids);
 
     const data = { generatedAt: new Date().toISOString(), page, sections, related };
-    this.cache = { at: Date.now(), version, data };
+    this.cache.set(tz, { at: Date.now(), version, data });
     return data;
+  }
+
+  private viewItems(blocks: Block[]): NfRecord[] {
+    return blocks.flatMap((b) => [...((b.items as NfRecord[] | undefined) ?? []), ...this.viewItems(b.children ?? [])]);
+  }
+
+  /**
+   * Notion cannot tell us what a database view on the page shows, so each view takes its meaning from the heading
+   * above it ("Today's Tasks" → tasks due today) and is filled with live records from NotionFlow's own tables.
+   */
+  private async attachViews(blocks: Block[], state: { heading: string }, jobs: Promise<void>[], used: Set<string>, today: string) {
+    const cols = this.collections.list().filter((c) => c.databaseId).map((c) => ({ key: c.key, label: c.label }));
+    for (const b of blocks) {
+      if (b.type === 'heading') state.heading = (b.text ?? []).map((s) => s.text).join('');
+      if (b.type === 'database') {
+        const guess = inferView(state.heading, cols);
+        const key = b.collectionKey ?? guess?.collectionKey;
+        if (key) {
+          const preset = guess?.preset ?? 'all';
+          b.collectionKey = key;
+          b.preset = preset;
+          b.heading = state.heading;
+          used.add(key);
+          jobs.push(
+            this.entities.list(key, { pageSize: 8, ...presetFilters(preset, today) })
+              .then((r) => { b.items = r.items; b.hasMore = !!r.nextCursor; })
+              .catch(() => { b.items = []; }),
+          );
+        } else {
+          b.heading = state.heading;
+        }
+      }
+      if (b.children?.length) await this.attachViews(b.children, state, jobs, used, today);
+    }
   }
 
   private async loadSections(): Promise<Section[]> {
@@ -75,7 +113,7 @@ export class HomeService {
     );
   }
 
-  private async loadPage() {
+  private async loadPage(tz: number) {
     const id = this.cfg.get<string>('NOTION_HOME_PAGE_ID');
     if (!id) return null;
     try {
@@ -104,9 +142,13 @@ export class HomeService {
       };
 
       const blocks = await fetchChildren(id, 0);
-      return { title, url: page.url as string, blocks, skipped, truncated: calls >= MAX_BLOCK_CALLS || count >= MAX_BLOCKS, error: null as string | null };
+      const used = new Set<string>();
+      const jobs: Promise<void>[] = [];
+      await this.attachViews(blocks, { heading: '' }, jobs, used, lastNDays(1, tz)[0]);
+      await Promise.all(jobs);
+      return { title, url: page.url as string, blocks, used: [...used], skipped, truncated: calls >= MAX_BLOCK_CALLS || count >= MAX_BLOCKS, error: null as string | null };
     } catch {
-      return { title: 'Home', url: null, blocks: [] as Block[], skipped: 0, truncated: false, error: 'Could not read your Notion home page. Is it shared with the integration (page → ··· → Connections)?' };
+      return { title: 'Home', url: null, blocks: [] as Block[], used: [] as string[], skipped: 0, truncated: false, error: 'Could not read your Notion home page. Is it shared with the integration (page → ··· → Connections)?' };
     }
   }
 
