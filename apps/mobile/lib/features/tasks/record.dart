@@ -75,10 +75,12 @@ class CollectionMeta {
   const CollectionMeta({required this.fields, required this.statuses, required this.priorities, this.style = CardStyle.standard});
   bool has(String k) => fields.containsKey(k);
   factory CollectionMeta.fromJson(Map<String, dynamic> j) {
-    final opts = (j['options'] as Map<String, dynamic>?) ?? const {};
+    // Tolerant of any Map type (e.g. an empty literal is Map<dynamic, dynamic>).
+    final opts = ((j['options'] as Map?) ?? const {}).cast<String, dynamic>();
+    final rawFields = ((j['fields'] as Map?) ?? const {}).cast<String, dynamic>();
     return CollectionMeta(
       fields: {
-        for (final e in ((j['fields'] as Map<String, dynamic>?) ?? const <String, dynamic>{}).entries)
+        for (final e in rawFields.entries)
           if (e.value is String) e.key: e.value as String,
       },
       statuses: ((opts['status'] as List?) ?? const []).cast<String>(),
