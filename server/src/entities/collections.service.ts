@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
 import { FieldMap } from './mapping';
+import { slugify } from '../home/home.util';
+
+const norm = (s?: string) => (s ?? '').replace(/-/g, '').toLowerCase();
 
 export interface Collection {
   key: string;
@@ -11,6 +14,8 @@ export interface Collection {
   icon?: string;
   description?: string;
   fields?: FieldMap;
+  /** true = found automatically on the Notion home page (not listed in the server settings). */
+  discovered?: boolean;
 }
 
 const BUILTIN: [string, string, string, string][] = [
@@ -30,6 +35,9 @@ const FIELD_KEYS = ['title', 'status', 'priority', 'due', 'done', 'relation', 'p
 @Injectable()
 export class CollectionsService {
   private readonly items: Collection[] = [];
+  private discovered: Collection[] = [];
+  private discoverer?: () => Promise<void>;
+  private lastDiscovery = 0;
 
   constructor(cfg: ConfigService) {
     for (const [key, label, env, icon] of BUILTIN) {
@@ -73,13 +81,39 @@ export class CollectionsService {
   }
 
   list(): Collection[] {
-    return this.items;
+    return [...this.items, ...this.discovered];
   }
   get(key: string): Collection | undefined {
-    return this.items.find((c) => c.key === key);
+    return this.list().find((c) => c.key === key);
   }
+
+  /** The Home service registers how to look for tables on the Notion home page. */
+  setDiscoverer(fn: () => Promise<void>) {
+    this.discoverer = fn;
+  }
+
+  /** Re-scan the Notion home page (at most every 30 s). Used when a client asks for a table we do not know yet. */
+  async discover(): Promise<void> {
+    if (!this.discoverer || Date.now() - this.lastDiscovery < 30_000) return;
+    this.lastDiscovery = Date.now();
+    try { await this.discoverer(); } catch { /* best effort */ }
+  }
+
+  /** Register (or find) the table behind a data source seen on the home page. Returns its key. */
+  addDiscovered(dataSourceId: string, label: string): string {
+    const existing = this.list().find((c) => c.databaseId && norm(c.databaseId) === norm(dataSourceId));
+    if (existing) return existing.key;
+    const base = slugify(label) || `t-${norm(dataSourceId).slice(0, 8)}`;
+    let key = base;
+    for (let i = 2; this.list().some((c) => c.key === key); i++) key = `${base.slice(0, 26)}-${i}`;
+    this.discovered.push({ key, label: label.trim() || 'Table', databaseId: dataSourceId, builtin: false, discovered: true });
+    return key;
+  }
+
   /** Safe for clients: never includes database IDs. */
   publicList() {
-    return this.items.map((c) => ({ key: c.key, label: c.label, icon: c.icon, builtin: c.builtin, description: c.description, configured: !!c.databaseId }));
+    return this.list().map((c) => ({
+      key: c.key, label: c.label, icon: c.icon, builtin: c.builtin, description: c.description, configured: !!c.databaseId, discovered: !!c.discovered,
+    }));
   }
 }

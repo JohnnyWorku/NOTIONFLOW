@@ -32,7 +32,11 @@ export const LearningController = make('learning');
 @Controller('collections')
 export class CollectionsController {
   constructor(private cols: CollectionsService) {}
-  @Get() list() { return this.cols.publicList(); }
+  /** Tables found on the Notion home page are picked up in the background; they show on the next refresh. */
+  @Get() list() {
+    void this.cols.discover();
+    return this.cols.publicList();
+  }
 }
 
 /** Works for every collection, built-in or custom: /api/c/<key>[/<pageId>] */

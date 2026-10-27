@@ -23,6 +23,8 @@ void main() {
     expect(p.nextCursor, 'abc');
   });
 
+  cardStyleTests();
+
   test('parses collection metadata and ignores unmapped fields', () {
     final m = CollectionMeta.fromJson({
       'fields': {'title': 'Name', 'status': 'Status', 'amount': 'Pages'},
@@ -31,5 +33,19 @@ void main() {
     expect(m.has('status'), true);
     expect(m.has('due'), false);
     expect(m.statuses, ['Todo', 'Done']);
+  });
+}
+
+void cardStyleTests() {
+  test('maps the server style name to a card design', () {
+    expect(cardStyleFrom('task'), CardStyle.task);
+    expect(cardStyleFrom('habit'), CardStyle.habit);
+    expect(cardStyleFrom('nonsense'), CardStyle.standard);
+    expect(cardStyleFrom(null), CardStyle.standard);
+  });
+
+  test('collection metadata carries its card style', () {
+    final m = CollectionMeta.fromJson({'fields': {'title': 'Name'}, 'options': {}, 'style': 'goal'});
+    expect(m.style, CardStyle.goal);
   });
 }

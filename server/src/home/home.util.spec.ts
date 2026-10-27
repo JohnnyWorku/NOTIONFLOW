@@ -59,3 +59,34 @@ describe('heading → live view', () => {
     expect(presetFilters('upcoming', '2026-10-22')).toEqual({ dueFrom: '2026-10-23', open: true });
   });
 });
+
+import { composeFilter, runPool, slugify, stripEmoji } from './home.util';
+
+describe('exact view helpers', () => {
+  it('keeps the view filter untouched when there are no quick filters', () => {
+    const f = { property: 'Status', status: { equals: 'Active' } };
+    expect(composeFilter(f, null)).toBe(f);
+    expect(composeFilter(null, {})).toBeUndefined();
+  });
+  it('adds quick filters that have a value and skips empty or "me" ones', () => {
+    const f = { and: [{ property: 'Done', checkbox: { equals: false } }] };
+    expect(composeFilter(f, { Priority: { select: { equals: 'High' } }, Status: {}, Owner: { people: { contains: 'me' } } })).toEqual({
+      and: [{ property: 'Done', checkbox: { equals: false } }, { property: 'Priority', select: { equals: 'High' } }],
+    });
+    expect(composeFilter({ or: [{ property: 'A', checkbox: { equals: true } }] }, { P: { select: { equals: 'x' } } })).toEqual({
+      and: [{ or: [{ property: 'A', checkbox: { equals: true } }] }, { property: 'P', select: { equals: 'x' } }],
+    });
+  });
+  it('makes safe keys from names', () => {
+    expect(stripEmoji('📌 Today’s Tasks')).toBe('Today’s Tasks');
+    expect(slugify('📚 Learning Log')).toBe('learning-log');
+    expect(slugify('Prayer & Quran!')).toBe('prayer-quran');
+    expect(slugify('ጸሎት')).toBe('');
+  });
+  it('limits concurrency', async () => {
+    let running = 0, peak = 0;
+    const task = async () => { running++; peak = Math.max(peak, running); await new Promise((r) => setTimeout(r, 5)); running--; };
+    await runPool(Array.from({ length: 8 }, () => task), 3);
+    expect(peak).toBeLessThanOrEqual(3);
+  });
+});

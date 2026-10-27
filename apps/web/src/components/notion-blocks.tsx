@@ -26,18 +26,24 @@ function LiveView({ b, related }: { b: Block; related: Record<string, Related> }
   const items: NfRecord[] = b.items ?? [];
   return (
     <div className="space-y-2">
-      {items.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-center text-sm text-slate-500">{EMPTY[b.preset ?? ''] ?? 'Nothing here yet.'}</p>
+      {b.error ? (
+        <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">{b.error}</p>
+      ) : items.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-center text-sm text-slate-500">{b.exact ? 'Nothing in this view right now.' : EMPTY[b.preset ?? ''] ?? 'Nothing here yet.'}</p>
       ) : (
         <ul className="space-y-2">
           {items.map((r) => (
-            <RecordRow key={r.id} r={r} dense related={(r.relatedIds ?? []).map((id) => related[id]).filter((x): x is Related => !!x)} />
+            <RecordRow key={r.id} r={r} dense variant={b.style} related={(r.relatedIds ?? []).map((id) => related[id]).filter((x): x is Related => !!x)} />
           ))}
         </ul>
       )}
-      {b.collectionKey && (
-        <Link href={`/c/${b.collectionKey}`} className="inline-block text-xs font-medium text-indigo-600 hover:underline">{b.hasMore ? 'View all →' : 'Open table →'}</Link>
-      )}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        {b.collectionKey && <Link href={`/c/${b.collectionKey}`} className="font-medium text-indigo-600 hover:underline">Open table →</Link>}
+        {b.viewUrl && <a href={b.viewUrl} target="_blank" rel="noreferrer" className="font-medium text-indigo-600 hover:underline">{b.hasMore ? 'See the rest in Notion ↗' : 'Open this view in Notion ↗'}</a>}
+        <span className="text-slate-400">
+          {b.exact ? `Same filter as your Notion view${b.viewName ? ` “${b.viewName}”` : ''}` : 'Approximate filter, read from the heading'}
+        </span>
+      </div>
     </div>
   );
 }
@@ -90,7 +96,7 @@ function One({ b, n, related }: { b: Block; n: number; related: Record<string, R
       </div>
     );
     case 'column': return <NotionBlocks blocks={b.children ?? []} related={related} />;
-    case 'database': return b.items ? <LiveView b={b} related={related} /> : <Tile b={b} />;
+    case 'database': return b.items || b.error ? <LiveView b={b} related={related} /> : <Tile b={b} />;
     case 'page': case 'link': return <Tile b={b} />;
     default: return null;
   }

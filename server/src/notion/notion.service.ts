@@ -123,6 +123,16 @@ export class NotionService {
     );
   }
 
+  /** Views of a database block, e.g. a linked database view placed on a page (Notion Views API). */
+  listViews(databaseId: string): Promise<any> {
+    return this.call(() => this.c().request({ path: 'views', method: 'get', query: { database_id: databaseId } }));
+  }
+
+  /** Full view definition: name, type, filter, sorts, quick_filters, data_source_id, url. */
+  getView(viewId: string): Promise<any> {
+    return this.call(() => this.c().request({ path: `views/${viewId}`, method: 'get' }));
+  }
+
   /** Children of a block/page (used to mirror your Notion home page). */
   listBlocks(blockId: string, cursor?: string): Promise<any> {
     return this.call(() => this.c().blocks.children.list({ block_id: blockId, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) }));

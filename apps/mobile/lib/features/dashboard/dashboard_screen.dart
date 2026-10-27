@@ -67,6 +67,10 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dash = ref.watch(dashboardProvider);
     final home = ref.watch(homeProvider);
+    // Tables added to your Notion home page are registered while Home loads: refresh the Tables tab.
+    ref.listen(homeProvider, (prev, next) {
+      if (next.hasValue) ref.invalidate(collectionsProvider);
+    });
     final tasks = dash.valueOrNull?['tasks'] as Map<String, dynamic>?;
     final overdue = tasks == null ? <NfRecord>[] : _recs(tasks['overdue']);
     final today = tasks == null ? <NfRecord>[] : _recs(tasks['today']);
@@ -134,17 +138,17 @@ class DashboardScreen extends ConsumerWidget {
                 ],
                 if (overdue.isNotEmpty) ...[
                   SectionHeader('Overdue', count: overdue.length),
-                  for (final r in overdue.take(5)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r)),
+                  for (final r in overdue.take(5)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r, style: CardStyle.task)),
                 ],
                 if (!mirrored) ...[
                   SectionHeader('Today', count: today.length),
                   if (today.isEmpty)
                     const AppCard(child: Text('No tasks due today.'))
                   else
-                    for (final r in today.take(6)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r)),
+                    for (final r in today.take(6)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r, style: CardStyle.task)),
                   if (upcoming.isNotEmpty) ...[
                     SectionHeader('Upcoming', count: upcoming.length),
-                    for (final r in upcoming.take(4)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r)),
+                    for (final r in upcoming.take(4)) Padding(padding: const EdgeInsets.only(bottom: 8), child: RecordCard(r, style: CardStyle.task)),
                   ],
                 ],
                 if (!mirrored || others.isNotEmpty) SectionHeader(mirrored ? 'Other tables' : 'Your tables'),
@@ -263,7 +267,7 @@ class _TableCard extends StatelessWidget {
         else if (section.items.isEmpty)
           Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('Nothing here yet.', style: TextStyle(color: cs.onSurfaceVariant)))
         else
-          for (final r in section.items) Padding(padding: const EdgeInsets.only(top: 8), child: RecordCard(r, flat: true, related: data.relatedFor(r))),
+          for (final r in section.items) Padding(padding: const EdgeInsets.only(top: 8), child: RecordCard(r, flat: true, style: section.style, related: data.relatedFor(r))),
       ]),
     );
   }

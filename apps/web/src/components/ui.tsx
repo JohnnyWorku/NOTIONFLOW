@@ -39,12 +39,12 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
   );
 }
 
-export function ProgressBar({ value, className = '' }: { value: number; className?: string }) {
+export function ProgressBar({ value, className = '', thick = false, color = 'bg-indigo-500' }: { value: number; className?: string; thick?: boolean; color?: string }) {
   const v = Math.max(0, Math.min(100, value));
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100}>
-        <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${v}%` }} />
+      <div className={`${thick ? 'h-2.5' : 'h-1.5'} flex-1 overflow-hidden rounded-full bg-slate-100`} role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100}>
+        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${v}%` }} />
       </div>
       <span className="w-9 text-right text-xs tabular-nums text-slate-500">{Math.round(v)}%</span>
     </div>

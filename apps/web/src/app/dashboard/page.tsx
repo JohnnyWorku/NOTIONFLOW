@@ -1,5 +1,6 @@
 'use client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CalendarClock, CalendarDays, ExternalLink, Flame, GraduationCap, FolderKanban, Target, type LucideIcon } from 'lucide-react';
 import { api, Collection, HomeData, NfRecord, Related } from '@/lib/api';
@@ -32,7 +33,7 @@ function Stat({ label, value, tone, icon: Icon }: { label: string; value: string
   );
 }
 
-function Focus({ title, items, empty }: { title: string; items: NfRecord[] | undefined; empty: string }) {
+function Focus({ title, items, empty }: { title: string; items: NfRecord[] | undefined; empty: string }) {  // tasks: always the task card
   return (
     <section>
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -41,7 +42,7 @@ function Focus({ title, items, empty }: { title: string; items: NfRecord[] | und
       </h2>
       {items === undefined ? <p className="text-sm text-slate-500">Database not configured.</p> :
         items.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">{empty}</p> :
-        <ul className="space-y-2">{items.map((r) => <RecordRow key={r.id} r={r} dense />)}</ul>}
+        <ul className="space-y-2">{items.map((r) => <RecordRow key={r.id} r={r} dense variant="task" />)}</ul>}
     </section>
   );
 }
@@ -112,6 +113,11 @@ export default function Home() {
   const dash = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dash>('dashboard') });
   const home = useQuery({ queryKey: ['home'], queryFn: () => api<HomeData>(`home?tz=${-new Date().getTimezoneOffset()}`) });
   const cols = useQuery({ queryKey: ['collections'], queryFn: () => api<Collection[]>('collections'), staleTime: 5 * 60_000 });
+  const qc = useQueryClient();
+  // Tables added to your Notion home page are registered while Home loads: refresh the menus so they appear.
+  useEffect(() => {
+    if (home.data) qc.invalidateQueries({ queryKey: ['collections'] });
+  }, [home.data?.generatedAt, qc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (dash.isError) return <ErrorBox error={dash.error} retry={() => dash.refetch()} />;
   if (!dash.data) return <Loading />;
@@ -181,7 +187,7 @@ export default function Home() {
                     <Link href={`/c/${s.key}`} className="text-sm font-medium text-indigo-600 hover:underline">{s.hasMore ? 'View all →' : 'Open →'}</Link>
                   </div>
                   {s.error ? <p className="text-sm text-rose-700">{s.error}</p> : s.items.length === 0 ? <p className="text-sm text-slate-500">Nothing here yet.</p> : (
-                    <ul className="space-y-2">{s.items.map((r) => <RecordRow key={r.id} r={r} dense related={relatedFor(r)} />)}</ul>
+                    <ul className="space-y-2">{s.items.map((r) => <RecordRow key={r.id} r={r} dense variant={s.style} related={relatedFor(r)} />)}</ul>
                   )}
                 </div>
               );

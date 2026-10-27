@@ -105,3 +105,20 @@ export function buildProperties(f: FieldMap, schema: Record<string, any>, input:
 }
 
 export class MappingError extends Error {}
+
+
+/** Which card design a table gets. Decided from its name first, then from the shape of its properties. */
+export type CardStyle = 'task' | 'project' | 'goal' | 'learning' | 'habit' | 'standard';
+
+export function inferStyle(key: string, label: string, f: FieldMap): CardStyle {
+  const t = `${key} ${label}`.toLowerCase();
+  if (/task|to-?do|chore/.test(t)) return 'task';
+  if (/project/.test(t)) return 'project';
+  if (/goal|objective|okr/.test(t)) return 'goal';
+  if (/learn|course|study|read|book|skill/.test(t)) return 'learning';
+  if (/spirit|pray|quran|dhikr|worship|habit|journal|gratitude|health|workout|exercise|fitness|sleep|mood|fast/.test(t)) return 'habit';
+  if (f.done && f.due) return 'task';
+  if (f.progress) return f.status ? 'project' : 'goal';
+  if (f.amount || (f.due && !f.status)) return 'habit';
+  return 'standard';
+}

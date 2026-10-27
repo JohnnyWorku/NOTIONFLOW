@@ -79,7 +79,7 @@ export function CollectionView({ ckey, title, subtitle }: { ckey: string; title:
           <>
             <ul className="space-y-2.5">
               {items.map((r) => (
-                <RecordRow key={r.id} r={r} onEdit={() => setDialog({ record: r })} leading={
+                <RecordRow key={r.id} r={r} variant={meta.data?.style} onEdit={() => setDialog({ record: r })} leading={
                   r.done !== null ? (
                     <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 accent-indigo-600"
                       aria-label={`Mark ${r.title} ${r.done ? 'incomplete' : 'complete'}`} checked={r.done} disabled={toggle.isPending} onChange={() => toggle.mutate(r)} />

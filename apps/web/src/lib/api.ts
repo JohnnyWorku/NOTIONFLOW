@@ -4,9 +4,10 @@ export interface NfRecord {
   relatedIds: string[]; notes: string | null; created: string; lastEdited: string; unsupported: string[];
 }
 export interface Page<T> { items: T[]; nextCursor: string | null; mapping?: Record<string, string | undefined> }
-export interface Collection { key: string; label: string; icon?: string; builtin: boolean; description?: string; configured: boolean }
+export type CardStyle = 'task' | 'project' | 'goal' | 'learning' | 'habit' | 'standard';
+export interface Collection { key: string; label: string; icon?: string; builtin: boolean; description?: string; configured: boolean; discovered?: boolean }
 export interface Meta {
-  key: string; label: string; fields: Record<string, string | undefined>;
+  key: string; label: string; style?: CardStyle; fields: Record<string, string | undefined>;
   options: { status: string[]; priority: string[] };
 }
 export interface DayCount { date: string; count: number }
@@ -29,9 +30,11 @@ export interface Block {
   level?: 1 | 2 | 3; text?: Seg[]; checked?: boolean; icon?: string; title?: string; url?: string; collectionKey?: string; children?: Block[];
   /** Live records for a database view the server resolved from the heading above it. */
   items?: NfRecord[]; hasMore?: boolean; heading?: string; preset?: string;
+  /** exact = filter and sorts come from the real Notion view; otherwise guessed from the heading. */
+  exact?: boolean; viewName?: string; viewUrl?: string; style?: CardStyle; error?: string;
 }
 export interface Related { id: string; title: string; status: string | null; url: string; collectionKey?: string }
-export interface HomeSection { key: string; label: string; icon?: string; builtin: boolean; items: NfRecord[]; hasMore: boolean; error?: string }
+export interface HomeSection { key: string; label: string; icon?: string; builtin: boolean; style: CardStyle; items: NfRecord[]; hasMore: boolean; error?: string }
 export interface HomeData {
   generatedAt: string;
   page: { title: string; url: string | null; blocks: Block[]; used: string[]; skipped: number; truncated: boolean; error: string | null } | null;

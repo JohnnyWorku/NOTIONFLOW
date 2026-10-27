@@ -21,16 +21,21 @@ class Block {
   final int level;
   final List<Seg> text;
   final bool checked;
-  final String? icon, title, url, collectionKey, heading, preset;
+  final String? icon, title, url, collectionKey, heading, preset, viewName, viewUrl, error;
   final List<Block> children;
 
   /// Live records for a database view the server resolved from the heading above it (null = not resolved).
   final List<NfRecord>? items;
   final bool hasMore;
+
+  /// true = the filter and sorts come from the real Notion view; false = guessed from the heading.
+  final bool exact;
+  final CardStyle style;
   const Block({
     required this.id, required this.type, this.level = 0, this.text = const [], this.checked = false,
     this.icon, this.title, this.url, this.collectionKey, this.children = const [],
     this.items, this.hasMore = false, this.heading, this.preset,
+    this.viewName, this.viewUrl, this.error, this.exact = false, this.style = CardStyle.standard,
   });
   factory Block.fromJson(Map<String, dynamic> j) => Block(
         id: j['id'] as String,
@@ -47,6 +52,11 @@ class Block {
         hasMore: j['hasMore'] == true,
         heading: j['heading'] as String?,
         preset: j['preset'] as String?,
+        viewName: j['viewName'] as String?,
+        viewUrl: j['viewUrl'] as String?,
+        error: j['error'] as String?,
+        exact: j['exact'] == true,
+        style: cardStyleFrom(j['style'] as String?),
       );
 }
 
@@ -73,14 +83,16 @@ class HomeSection {
   final String key, label;
   final String? icon, error;
   final bool hasMore;
+  final CardStyle style;
   final List<NfRecord> items;
-  const HomeSection({required this.key, required this.label, this.icon, this.error, this.hasMore = false, this.items = const []});
+  const HomeSection({required this.key, required this.label, this.icon, this.error, this.hasMore = false, this.style = CardStyle.standard, this.items = const []});
   factory HomeSection.fromJson(Map<String, dynamic> j) => HomeSection(
         key: j['key'] as String,
         label: j['label'] as String,
         icon: j['icon'] as String?,
         error: j['error'] as String?,
         hasMore: j['hasMore'] == true,
+        style: cardStyleFrom(j['style'] as String?),
         items: ((j['items'] as List?) ?? const []).map((e) => NfRecord.fromJson(e as Map<String, dynamic>)).toList(),
       );
 }

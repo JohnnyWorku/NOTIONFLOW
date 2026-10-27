@@ -28,6 +28,13 @@ Notion-driven Status/Priority dropdowns, edit + delete + load-more on web and mo
 - Home no longer repeats the same data: mirrored page = main body; only overdue tasks and tables not on the page appear below.
 - Executed here: heading→table/preset inference and date-range maths (Node script). Not executed: Nest wiring, web build, Flutter analyze/test.
 
+## 0.4.0 changes
+- Home uses the EXACT filters and sorts of the database views on your Notion home page (Notion Views API), with a heading-based fallback.
+- Tables added to the Notion home page are discovered and registered automatically (no settings change); they get create/edit/delete like other tables.
+- A different card design per kind of table (task, project, goal, learning, habit/log, standard) on web and mobile.
+- Executed here: the real HomeService/CollectionsService logic against a fake Notion modelled on your page (exact filter + sorts, auto-discovery, unshared database, API-unavailable fallback, section de-duplication, relations, caching, cold-start discovery) and the pure helpers. Not executed: Nest build, web build, Flutter analyze/test, and any call to the real Notion Views API.
+- Unverified assumption: the Views API calls are made with the SDK's generic `request()` (GET /views?database_id=<database block id>, GET /views/{id}); field names follow Notion's current docs. `node scripts/diagnose.mjs` reports per view whether it was EXACT.
+
 ## Known limits
 - Task completion day is estimated from last edit (Notion stores no completion time).
 - Statistics read up to 300 records per table.

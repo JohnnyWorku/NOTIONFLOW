@@ -172,6 +172,7 @@ class _RecordsState extends ConsumerState<RecordsScreen> {
                                 final r = _items[i];
                                 return RecordCard(
                                   r,
+                                  style: meta?.style ?? CardStyle.standard,
                                   onTap: () => _openForm(r),
                                   onLongPress: () => _confirmDelete(r),
                                   leading: r.done == null

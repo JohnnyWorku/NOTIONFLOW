@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/record_card.dart';
 import '../tasks/record.dart';
@@ -56,17 +57,32 @@ class NotionBlocksView extends StatelessWidget {
   /// A database view from the Notion page, filled with live records from the matching table.
   Widget _live(BuildContext context, Block b) {
     final cs = Theme.of(context).colorScheme;
-    final items = b.items!;
+    final items = b.items ?? const <NfRecord>[];
+    final caption = b.exact ? 'Same filter as your Notion view${b.viewName != null ? ' “${b.viewName}”' : ''}' : 'Approximate filter, read from the heading';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (items.isEmpty)
-        Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(_empty[b.preset] ?? 'Nothing here yet.', style: TextStyle(color: cs.onSurfaceVariant)))
+      if (b.error != null)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
+          child: Text(b.error!, style: TextStyle(color: cs.onErrorContainer)),
+        )
+      else if (items.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(b.exact ? 'Nothing in this view right now.' : (_empty[b.preset] ?? 'Nothing here yet.'), style: TextStyle(color: cs.onSurfaceVariant)),
+        )
       else
         for (final r in items)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: RecordCard(r, flat: true, related: [for (final id in r.relatedIds) if (related[id] != null) related[id]!]),
+            child: RecordCard(r, flat: true, style: b.style, related: [for (final id in r.relatedIds) if (related[id] != null) related[id]!]),
           ),
-      if (b.collectionKey != null) TextButton(onPressed: () => onOpen(b), child: Text(b.hasMore ? 'View all' : 'Open table')),
+      Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
+        if (b.collectionKey != null) TextButton(onPressed: () => onOpen(b), child: const Text('Open table')),
+        if (b.viewUrl != null) TextButton(onPressed: () => launchUrl(Uri.parse(b.viewUrl!), mode: LaunchMode.externalApplication), child: Text(b.hasMore ? 'See the rest in Notion' : 'Open this view in Notion')),
+      ]),
+      Text(caption, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.outline)),
     ]);
   }
 
@@ -152,7 +168,7 @@ class NotionBlocksView extends StatelessWidget {
       case 'column':
         return NotionBlocksView(blocks: b.children, onOpen: onOpen, related: related);
       case 'database':
-        return b.items != null ? _live(context, b) : _tile(context, b);
+        return (b.items != null || b.error != null) ? _live(context, b) : _tile(context, b);
       case 'page':
       case 'link':
         return _tile(context, b);

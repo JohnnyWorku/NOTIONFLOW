@@ -58,3 +58,22 @@ describe('mapping: amount and created', () => {
     expect(buildProperties(f, sch, { amount: 7 })).toEqual({ Pages: { number: 7 } });
   });
 });
+
+import { inferStyle } from './mapping';
+
+describe('card style', () => {
+  it('uses the table name first', () => {
+    expect(inferStyle('tasks', 'Tasks', {})).toBe('task');
+    expect(inferStyle('projects', 'Projects', {})).toBe('project');
+    expect(inferStyle('goals', 'Goals', {})).toBe('goal');
+    expect(inferStyle('learning', 'Learning', {})).toBe('learning');
+    expect(inferStyle('spiritual', 'Spiritual', {})).toBe('habit');
+  });
+  it('falls back to the shape of the properties', () => {
+    expect(inferStyle('x', 'Chores list', { done: 'Done', due: 'Due' })).toBe('task');
+    expect(inferStyle('x', 'Stuff', { progress: 'P', status: 'S' })).toBe('project');
+    expect(inferStyle('x', 'Stuff', { progress: 'P' })).toBe('goal');
+    expect(inferStyle('x', 'Stuff', { amount: 'Pages' })).toBe('habit');
+    expect(inferStyle('x', 'Stuff', {})).toBe('standard');
+  });
+});

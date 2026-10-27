@@ -64,7 +64,7 @@ else {
   const list = cols.json ?? [];
   const configured = list.filter((c) => c.configured);
   (configured.length ? ok : bad)(`${configured.length} of ${list.length} tables have a database ID`);
-  for (const c of list) info(`${c.configured ? '✔' : '✘'} ${c.key.padEnd(10)} ${c.label}${c.builtin ? '' : ' (custom)'}${c.configured ? '' : '  ← set its database ID on the server'}`);
+  for (const c of list) info(`${c.configured ? '✔' : '✘'} ${c.key.padEnd(14)} ${c.label}${c.discovered ? ' (found on your Notion home page)' : c.builtin ? '' : ' (custom)'}${c.configured ? '' : '  ← set its database ID on the server'}`);
   if (!configured.length) info('Set NOTION_TASKS_DB etc. (or NOTION_COLLECTIONS), then restart/redeploy the backend.');
 }
 
@@ -89,7 +89,19 @@ else {
   for (const s of home.json.sections ?? []) (s.error ? bad : ok)(`${s.label}: ${s.error ?? `${s.items.length} record(s)${s.hasMore ? ' (+ more)' : ''}`}`);
   if (!(home.json.sections ?? []).length) bad('No tables configured (see step 3).');
   const p = home.json.page;
-  if (p) (p.error ? bad : ok)(p.error ? `Notion home page: ${p.error}` : `Notion home page "${p.title}": ${p.blocks.length} top-level block(s), ${p.skipped} skipped`);
+  if (p) {
+    (p.error ? bad : ok)(p.error ? `Notion home page: ${p.error}` : `Notion home page "${p.title}": ${p.blocks.length} top-level block(s), ${p.skipped} skipped`);
+    const dbs = [];
+    const walk = (bs) => (bs ?? []).forEach((b) => { if (b.type === 'database') dbs.push(b); walk(b.children); });
+    walk(p.blocks);
+    for (const b of dbs) {
+      const what = b.error ? `ERROR: ${b.error}`
+        : b.collectionKey ? `${b.collectionKey} · ${b.exact ? `EXACT Notion view${b.viewName ? ` “${b.viewName}”` : ''}` : 'approximate (guessed from the heading)'} · ${b.items?.length ?? 0} item(s)`
+        : 'not matched to any table';
+      (b.error || !b.collectionKey ? bad : ok)(`${(b.heading ?? '').trim() || '(no heading)'} → ${what}`);
+    }
+    if (dbs.some((b) => b.collectionKey && !b.exact)) info('"approximate" means the Notion Views API could not be used for that block (see docs/notion-setup.md, step 8).');
+  }
   else info('No NOTION_HOME_PAGE_ID set (optional).');
 }
 if (web) {

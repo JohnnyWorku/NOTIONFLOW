@@ -8,7 +8,11 @@ export interface Block {
   title?: string; url?: string; collectionKey?: string; children?: Block[];
   /** Set on database blocks when the server resolved the view to a table: live records for it. */
   items?: unknown[]; hasMore?: boolean; heading?: string; preset?: Preset;
+  /** true = the filter/sorts were read from the real Notion view; false/undefined = guessed from the heading. */
+  exact?: boolean; viewName?: string; viewUrl?: string; style?: CardStyle; error?: string;
 }
+import type { CardStyle } from '../entities/mapping';
+
 export type Matcher = (q: { id?: string; title?: string }) => string | undefined;
 
 export const notionUrl = (id: string) => `https://www.notion.so/${id.replace(/-/g, '')}`;
@@ -135,4 +139,47 @@ export function presetFilters(preset: Preset, today: string): { dueFrom?: string
     case 'open': return { open: true };
     default: return {};
   }
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Exact Notion views (Views API): reuse the saved filter + sorts of the view placed on the page.
+// ---------------------------------------------------------------------------------------------
+export const stripEmoji = (s: string): string => s.replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu, '').replace(/\s+/g, ' ').trim();
+
+/** URL-safe table key. Empty when the name has no Latin letters/digits (the caller then falls back to the id). */
+export function slugify(s: string): string {
+  const t = stripEmoji(s).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, '');
+  return /^[a-z0-9]/.test(t) ? t : '';
+}
+
+/**
+ * The view's own filter plus any quick filters that have a value. Quick filters that need "me" (the viewer) are skipped:
+ * an integration has no Notion user to substitute. Stays within Notion's two-level nesting limit by merging into a top-level `and`.
+ */
+export function composeFilter(filter: any | null | undefined, quick: Record<string, any> | null | undefined): any | undefined {
+  const extra: any[] = [];
+  for (const [property, cond] of Object.entries(quick ?? {})) {
+    if (!cond || typeof cond !== 'object' || Object.keys(cond).length === 0) continue;
+    if (JSON.stringify(cond).includes('"me"')) continue;
+    extra.push({ property, ...cond });
+  }
+  if (!filter) return extra.length === 0 ? undefined : extra.length === 1 ? extra[0] : { and: extra };
+  if (extra.length === 0) return filter;
+  if (Array.isArray(filter.and)) return { and: [...filter.and, ...extra] };
+  return { and: [filter, ...extra] };
+}
+
+/** Runs async tasks with limited concurrency (Notion allows about 3 requests per second). */
+export async function runPool(tasks: (() => Promise<unknown>)[], size: number): Promise<void> {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(size, tasks.length) }, async () => {
+      while (next < tasks.length) {
+        const task = tasks[next++];
+        await task().catch(() => undefined);
+      }
+    }),
+  );
 }

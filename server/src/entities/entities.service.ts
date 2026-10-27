@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import { NotionService } from '../notion/notion.service';
 import { SyncService } from '../sync/sync.service';
 import { CollectionsService } from './collections.service';
-import { FieldMap, Kind, MappingError, NfRecord, buildProperties, detectFields, pageToRecord } from './mapping';
+import { FieldMap, Kind, MappingError, NfRecord, buildProperties, detectFields, inferStyle, pageToRecord } from './mapping';
 import { CreateRecordDto, ListQueryDto, UpdateRecordDto } from './dto';
 
 @Injectable()
@@ -25,6 +25,11 @@ export class EntitiesService {
     return c.databaseId;
   }
 
+  /** A table that was just added to the Notion home page may not be known yet: look for it once before giving up. */
+  private async ensure(kind: Kind) {
+    if (!this.collections.get(kind)) await this.collections.discover();
+  }
+
   private async ctx(kind: Kind) {
     const src = await this.notion.resolve(this.dbId(kind));
     const inline = this.collections.get(kind)?.fields;
@@ -33,6 +38,7 @@ export class EntitiesService {
 
   /** Field mapping + allowed Status/Priority options, so clients can render real dropdowns. */
   async meta(kind: Kind) {
+    await this.ensure(kind);
     const { src, fields } = await this.ctx(kind);
     const options = (name?: string): string[] => {
       const p = name ? src.properties[name] : undefined;
@@ -43,11 +49,13 @@ export class EntitiesService {
       label: this.collections.get(kind)?.label ?? kind,
       title: src.title,
       fields,
+      style: inferStyle(kind, this.collections.get(kind)?.label ?? kind, fields),
       options: { status: options(fields.status), priority: options(fields.priority) },
     };
   }
 
   async list(kind: Kind, q: ListQueryDto) {
+    await this.ensure(kind);
     const { src, fields } = await this.ctx(kind);
     const and: any[] = [];
     if (q.search && fields.title) and.push({ property: fields.title, title: { contains: q.search } });
@@ -85,6 +93,27 @@ export class EntitiesService {
     };
   }
 
+  /**
+   * Records exactly as a saved Notion view selects them: the view's own filter and sorts, passed straight to Notion.
+   * `style` tells clients which card design fits this table.
+   */
+  async listView(kind: Kind, args: { filter?: unknown; sorts?: unknown[] | null; pageSize?: number; cursor?: string }) {
+    await this.ensure(kind);
+    const { src, fields } = await this.ctx(kind);
+    const res = await this.notion.query(src, {
+      filter: args.filter ?? undefined,
+      sorts: args.sorts && args.sorts.length ? args.sorts : undefined,
+      start_cursor: args.cursor,
+      page_size: args.pageSize ?? 10,
+    });
+    return {
+      items: res.results.map((p: any) => pageToRecord(p, fields)) as NfRecord[],
+      hasMore: !!res.has_more,
+      nextCursor: (res.has_more ? res.next_cursor : null) as string | null,
+      style: inferStyle(kind, this.collections.get(kind)?.label ?? kind, fields),
+    };
+  }
+
   /** Walks pages (up to `max` records) for statistics. */
   async all(kind: Kind, max = 300): Promise<{ items: NfRecord[]; truncated: boolean }> {
     const items: NfRecord[] = [];
@@ -99,6 +128,7 @@ export class EntitiesService {
   }
 
   async get(kind: Kind, pageId: string): Promise<NfRecord> {
+    await this.ensure(kind);
     const { fields } = await this.ctx(kind);
     const page = await this.notion.getPage(pageId);
     this.assertBelongs(page, kind);
@@ -129,6 +159,7 @@ export class EntitiesService {
 
   async create(kind: Kind, dto: CreateRecordDto, idemKey?: string): Promise<NfRecord> {
     this.gc();
+    await this.ensure(kind);
     if (idemKey) {
       const hit = this.idem.get(`${kind}:${idemKey}`);
       if (hit) return hit.record;
@@ -148,6 +179,7 @@ export class EntitiesService {
    * client saw, refuse with 409 and return the current record so the UI can show a merge/refresh prompt.
    */
   async update(kind: Kind, pageId: string, dto: UpdateRecordDto): Promise<NfRecord> {
+    await this.ensure(kind);
     const { src, fields } = await this.ctx(kind);
     const current = await this.notion.getPage(pageId);
     this.assertBelongs(current, kind);
@@ -164,6 +196,7 @@ export class EntitiesService {
 
   /** Archives (moves to Notion's trash); recoverable from Notion. */
   async archive(kind: Kind, pageId: string) {
+    await this.ensure(kind);
     const current = await this.notion.getPage(pageId);
     this.assertBelongs(current, kind);
     await this.notion.archivePage(pageId);

@@ -1,4 +1,9 @@
 /// Plain Dart models (no code generation) mirroring the backend contract.
+
+/// Which card design a table gets (decided by the server from the table's name and properties).
+enum CardStyle { task, project, goal, learning, habit, standard }
+
+CardStyle cardStyleFrom(String? s) => CardStyle.values.firstWhere((e) => e.name == s, orElse: () => CardStyle.standard);
 class NfRecord {
   final String id, url, title, lastEdited;
   final String? status, priority, due, notes;
@@ -65,7 +70,8 @@ class CollectionInfo {
 class CollectionMeta {
   final Map<String, String> fields;
   final List<String> statuses, priorities;
-  const CollectionMeta({required this.fields, required this.statuses, required this.priorities});
+  final CardStyle style;
+  const CollectionMeta({required this.fields, required this.statuses, required this.priorities, this.style = CardStyle.standard});
   bool has(String k) => fields.containsKey(k);
   factory CollectionMeta.fromJson(Map<String, dynamic> j) {
     final opts = (j['options'] as Map<String, dynamic>?) ?? const {};
@@ -76,6 +82,7 @@ class CollectionMeta {
       },
       statuses: ((opts['status'] as List?) ?? const []).cast<String>(),
       priorities: ((opts['priority'] as List?) ?? const []).cast<String>(),
+      style: cardStyleFrom(j['style'] as String?),
     );
   }
 }
