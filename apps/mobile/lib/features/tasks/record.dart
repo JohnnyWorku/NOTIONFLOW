@@ -1,9 +1,10 @@
-/// Plain Dart models (no code generation) mirroring the backend contract.
+// Plain Dart models (no code generation) mirroring the backend contract.
 
 /// Which card design a table gets (decided by the server from the table's name and properties).
 enum CardStyle { task, project, goal, learning, habit, standard }
 
 CardStyle cardStyleFrom(String? s) => CardStyle.values.firstWhere((e) => e.name == s, orElse: () => CardStyle.standard);
+
 class NfRecord {
   final String id, url, title, lastEdited;
   final String? status, priority, due, notes;
