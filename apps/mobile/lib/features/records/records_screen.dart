@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/record_card.dart';
@@ -129,7 +130,14 @@ class _RecordsState extends ConsumerState<RecordsScreen> {
     final showOverdue = meta != null && meta.has('due') && meta.has('done');
 
     return Scaffold(
-      appBar: AppBar(title: Text(_label), automaticallyImplyLeading: Navigator.of(context).canPop()),
+      appBar: AppBar(
+        title: Text(_label),
+        automaticallyImplyLeading: Navigator.of(context).canPop(),
+        actions: [
+          if (ref.watch(pageOfProvider(widget.kind)).valueOrNull case final pg?)
+            IconButton(tooltip: '${pg.title} page', icon: const Icon(Icons.description_outlined), onPressed: () => context.go('/collections/page/${pg.id}')),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), tooltip: 'New', child: const Icon(Icons.add)),
       body: Column(children: [
         Padding(

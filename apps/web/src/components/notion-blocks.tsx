@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ExternalLink, FileText, Table2 } from 'lucide-react';
+import { ChevronRight, ExternalLink, FileText, Table2 } from 'lucide-react';
 import type { Block, NfRecord, Related, Seg } from '@/lib/api';
 import { RecordRow } from './records';
 
@@ -39,6 +39,7 @@ function LiveView({ b, related }: { b: Block; related: Record<string, Related> }
       )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         {b.collectionKey && <Link href={`/c/${b.collectionKey}`} className="font-medium text-indigo-600 hover:underline">Open table →</Link>}
+        {b.pageId && <Link href={`/p/${b.pageId}`} className="font-medium text-indigo-600 hover:underline">Open {b.pageTitle ?? 'the'} page →</Link>}
         {b.viewUrl && <a href={b.viewUrl} target="_blank" rel="noreferrer" className="font-medium text-indigo-600 hover:underline">{b.hasMore ? 'See the rest in Notion ↗' : 'Open this view in Notion ↗'}</a>}
         <span className="text-slate-400">
           {b.exact ? `Same filter as your Notion view${b.viewName ? ` “${b.viewName}”` : ''}` : 'Approximate filter, read from the heading'}
@@ -49,6 +50,15 @@ function LiveView({ b, related }: { b: Block; related: Record<string, Related> }
 }
 
 function Tile({ b }: { b: Block }) {
+  if (b.type === 'page' && b.pageId) {
+    return (
+      <Link href={`/p/${b.pageId}`} className="flex items-center gap-3 rounded-2xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/70 px-3 py-2.5 text-sm font-medium transition hover:shadow-md">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-base text-amber-600" aria-hidden>{b.icon ?? <FileText size={16} />}</span>
+        <span className="truncate">{b.title ?? 'Untitled'}</span>
+        <ChevronRight size={16} className="ml-auto shrink-0 text-slate-400" />
+      </Link>
+    );
+  }
   const label = b.title ?? (b.heading ? `Open “${b.heading.trim()}” in Notion` : b.collectionKey ? 'Open table' : 'Open in Notion');
   const inner = (
     <>

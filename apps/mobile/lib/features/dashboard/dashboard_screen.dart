@@ -6,6 +6,7 @@ import '../../core/format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/icon_map.dart';
 import '../../core/widgets/mini_bars.dart';
+import '../../core/widgets/page_card.dart';
 import '../../core/widgets/record_card.dart';
 import '../../core/widgets/state_views.dart';
 import '../home/home_models.dart';
@@ -67,9 +68,13 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dash = ref.watch(dashboardProvider);
     final home = ref.watch(homeProvider);
+    final pages = ref.watch(pagesProvider).valueOrNull ?? const <PageRef>[];
     // Tables added to your Notion home page are registered while Home loads: refresh the Tables tab.
     ref.listen(homeProvider, (prev, next) {
-      if (next.hasValue) ref.invalidate(collectionsProvider);
+      if (next.hasValue) {
+        ref.invalidate(collectionsProvider);
+        ref.invalidate(pagesProvider);
+      }
     });
     final tasks = dash.valueOrNull?['tasks'] as Map<String, dynamic>?;
     final overdue = tasks == null ? <NfRecord>[] : _recs(tasks['overdue']);
@@ -121,13 +126,17 @@ class DashboardScreen extends ConsumerWidget {
                 if (dash.hasError) Padding(padding: const EdgeInsets.only(top: 12), child: SizedBox(height: 200, child: ErrorView(error: dash.error!, onRetry: () => ref.invalidate(dashboardProvider)))),
                 const SectionHeader('Performance'),
                 const _PerformanceCard(),
+                if (pages.isNotEmpty) ...[
+                  const SectionHeader('Pages'),
+                  for (final p in pages) Padding(padding: const EdgeInsets.only(bottom: 10), child: PageCard(page: p, onTap: () => context.go('/collections/page/${p.id}'))),
+                ],
                 if (page != null) ...[
                   SectionHeader(page.title),
                   AppCard(
                     child: page.error != null
                         ? Text(page.error!)
                         : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            NotionBlocksView(blocks: page.blocks, related: home.value!.related, onOpen: (b) => _openBlock(context, b)),
+                            NotionBlocksView(blocks: page.blocks, related: home.value!.related, onOpen: (b) => _openBlock(context, b), onOpenPage: (id) => context.go('/collections/page/$id')),
                             if (page.skipped > 0 || page.truncated)
                               Text(
                                 '${page.skipped > 0 ? '${page.skipped} block(s) (images, embeds) can’t be shown here. ' : ''}${page.truncated ? 'Showing the first part of a long page.' : ''}',
@@ -260,6 +269,7 @@ class _TableCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(child: Text(section.label, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700))),
+          if (section.pageId != null) TextButton(onPressed: () => context.go('/collections/page/${section.pageId}'), child: const Text('Page')),
           TextButton(onPressed: () => context.go('/collections/${section.key}'), child: Text(section.hasMore ? 'View all' : 'Open')),
         ]),
         if (section.error != null)

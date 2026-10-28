@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, CheckSquare, FolderKanban, GraduationCap, LayoutGrid, LayoutDashboard, LogOut, Settings, Smartphone, Target, Workflow, type LucideIcon } from 'lucide-react';
-import { api, Collection, signOut } from '@/lib/api';
+import { api, Collection, PageRef, signOut } from '@/lib/api';
 import { iconFor } from '@/lib/icons';
 
 interface Item { href: string; label: string; icon: LucideIcon }
@@ -36,6 +36,7 @@ export function Nav() {
   const path = usePathname();
   const health = useQuery({ queryKey: ['health'], queryFn: () => api<{ notionConfigured: boolean }>('health'), refetchInterval: 60_000, retry: false });
   const cols = useQuery({ queryKey: ['collections'], queryFn: () => api<Collection[]>('collections'), staleTime: 5 * 60_000, retry: false });
+  const pages = useQuery({ queryKey: ['pages'], queryFn: () => api<PageRef[]>(`pages?tz=${-new Date().getTimezoneOffset()}`), staleTime: 5 * 60_000, retry: false });
   const extras = (cols.data ?? []).filter((c) => !c.builtin && c.configured);
   const [dot, text] = health.isError ? ['bg-rose-500', 'Backend offline']
     : health.data?.notionConfigured ? ['bg-emerald-500', 'Notion connected']
@@ -56,6 +57,8 @@ export function Nav() {
           {MAIN.map(({ href, label, icon }) => link(href, label, icon))}
           {extras.length > 0 && <p className="mt-4 px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Your tables</p>}
           {extras.map((c) => link(`/c/${c.key}`, c.label, iconFor(c.icon)))}
+          {(pages.data ?? []).length > 0 && <p className="mt-4 px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Pages</p>}
+          {(pages.data ?? []).map((pg) => link(`/p/${pg.id}`, `${pg.icon ? `${pg.icon} ` : ''}${pg.title}`, iconFor(pg.iconName ?? 'folder')))}
           <div className="mt-auto space-y-1 border-t border-slate-100 pt-3">
             {link('/download', 'Get the app', Smartphone)}
             {link('/settings', 'Settings', Settings)}

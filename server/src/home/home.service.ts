@@ -9,11 +9,14 @@ import { lastNDays } from '../stats/stats.util';
 import { Block, HAS_CHILDREN, composeFilter, convertBlock, inferView, isEmptyParagraph, presetFilters, runPool, stripEmoji } from './home.util';
 
 export interface RelatedInfo { id: string; title: string; status: string | null; url: string; collectionKey?: string }
-interface Section { key: string; label: string; icon?: string; builtin: boolean; style: CardStyle; items: NfRecord[]; hasMore: boolean; error?: string }
+export interface PageRef { id: string; title: string; icon?: string; iconName?: string; source: 'home' | 'config' }
+interface Section { key: string; label: string; icon?: string; builtin: boolean; style: CardStyle; items: NfRecord[]; hasMore: boolean; error?: string; pageId?: string; pageTitle?: string }
+interface Mirror { id: string; title: string; icon?: string; url: string | null; blocks: Block[]; used: string[]; skipped: number; truncated: boolean; error: string | null }
 interface ViewDef { viewId: string; name: string; type: string; filter: unknown; sorts: unknown[] | null; quick: Record<string, unknown> | null; dataSourceId: string | null; url: string }
-interface Ctx { today: string; idMap: Map<string, string>; used: Set<string> }
+interface Ctx { today: string; idMap: Map<string, string>; used: Set<string>; skipPages: Set<string> }
 
 const norm = (s?: string) => (s ?? '').replace(/-/g, '').toLowerCase();
+const PAGE_ID = /^[0-9a-f-]{32,36}$/i;
 const MAX_BLOCK_CALLS = 25;
 const MAX_BLOCKS = 150;
 const VIEW_TTL = 2 * 60_000;
@@ -31,8 +34,10 @@ const VIEW_TTL = 2 * 60_000;
 export class HomeService {
   private readonly log = new Logger(HomeService.name);
   private cache = new Map<number, { at: number; version: number; data: unknown }>();
-  private pageCache = new Map<number, { at: number; version: number; page: Awaited<ReturnType<HomeService['loadPage']>> }>();
-  private pageInflight = new Map<number, Promise<Awaited<ReturnType<HomeService['loadPage']>>>>();
+  private pageCache = new Map<string, { at: number; version: number; page: Mirror }>();
+  private pageInflight = new Map<string, Promise<Mirror>>();
+  private pageMetaCache = new Map<string, { at: number; meta: { title: string; icon?: string; url: string } | null }>();
+  private readonly pinnedPages: { id: string; label?: string; icon?: string }[] = [];
   private viewCache = new Map<string, { at: number; def: ViewDef | null }>();
   private relatedCache = new Map<string, { at: number; info: RelatedInfo | null }>();
 
@@ -40,8 +45,22 @@ export class HomeService {
     private entities: EntitiesService, private collections: CollectionsService, private notion: NotionService,
     private sync: SyncService, private cfg: ConfigService,
   ) {
+    const raw = cfg.get<string>('NOTION_PAGES');
+    if (raw?.trim()) {
+      let parsed: unknown;
+      try { parsed = JSON.parse(raw); } catch { throw new Error('NOTION_PAGES is not valid JSON.'); }
+      if (!Array.isArray(parsed)) throw new Error('NOTION_PAGES must be a JSON array.');
+      for (const [i, p] of (parsed as any[]).entries()) {
+        if (!p || typeof p.id !== 'string' || !PAGE_ID.test(p.id)) throw new Error(`NOTION_PAGES[${i}].id must be a Notion page id.`);
+        this.pinnedPages.push({ id: p.id, label: typeof p.label === 'string' ? p.label : undefined, icon: typeof p.icon === 'string' ? p.icon : undefined });
+      }
+    }
     // Lets other parts of the server say "a table I don't know yet may be on the home page: look again".
     this.collections.setDiscoverer(async () => { await this.pageFor(0); });
+  }
+
+  private get homeId(): string | undefined {
+    return this.cfg.get<string>('NOTION_HOME_PAGE_ID') || undefined;
   }
 
   /** Match a block to a configured table by its id or title (used for inline databases that ARE the table). */
@@ -79,18 +98,103 @@ export class HomeService {
     return blocks.flatMap((b) => [...((b.items as NfRecord[] | undefined) ?? []), ...this.viewItems(b.children ?? [])]);
   }
 
-  /** The mirrored page, cached per timezone and shared between concurrent callers. */
-  private pageFor(tz: number) {
+  /** The mirrored home page (null when NOTION_HOME_PAGE_ID is not set). */
+  private pageFor(tz: number): Promise<Mirror | null> {
+    const id = this.homeId;
+    return id ? this.mirrorCached(id, tz) : Promise.resolve(null);
+  }
+
+  /** Any page, cached per timezone and shared between concurrent callers. */
+  private mirrorCached(pageId: string, tz: number): Promise<Mirror> {
+    const key = `${norm(pageId)}:${tz}`;
     const version = this.sync.status().version;
-    const hit = this.pageCache.get(tz);
+    const hit = this.pageCache.get(key);
     if (hit && hit.version === version && Date.now() - hit.at < 60_000) return Promise.resolve(hit.page);
-    const running = this.pageInflight.get(tz);
+    const running = this.pageInflight.get(key);
     if (running) return running;
-    const p = this.loadPage(tz)
-      .then((page) => { this.pageCache.set(tz, { at: Date.now(), version, page }); return page; })
-      .finally(() => this.pageInflight.delete(tz));
-    this.pageInflight.set(tz, p);
+    const p = this.mirror(pageId, tz)
+      .then((page) => { this.pageCache.set(key, { at: Date.now(), version, page }); return page; })
+      .finally(() => this.pageInflight.delete(key));
+    this.pageInflight.set(key, p);
     return p;
+  }
+
+  // ----------------------------------------------------------------------------------------------
+  // Pages
+  // ----------------------------------------------------------------------------------------------
+
+  /** Title, emoji and link of a page (cached). */
+  private async pageMeta(id: string): Promise<{ title: string; icon?: string; url: string } | null> {
+    const hit = this.pageMetaCache.get(id);
+    if (hit && Date.now() - hit.at < 10 * 60_000) return hit.meta;
+    try {
+      const p = await this.notion.getPage(id);
+      const t = (Object.values(p.properties ?? {}) as any[]).find((x) => x.type === 'title');
+      const meta = {
+        title: ((t?.title ?? []) as any[]).map((x) => x.plain_text).join('') || 'Untitled',
+        icon: p.icon?.type === 'emoji' ? (p.icon.emoji as string) : undefined,
+        url: p.url as string,
+      };
+      this.pageMetaCache.set(id, { at: Date.now(), meta });
+      return meta;
+    } catch {
+      return null;
+    }
+  }
+
+  /** The Notion page a table lives on (e.g. "Spiritual"), unless it is one we are already showing. */
+  private async pageOfCollection(key: string, skip: Set<string>): Promise<{ id: string; title: string; icon?: string } | null> {
+    const c = this.collections.get(key);
+    if (!c?.databaseId) return null;
+    let parentId: string | null;
+    try { parentId = await this.notion.parentPageOf(c.databaseId); } catch { return null; }
+    if (!parentId || skip.has(norm(parentId))) return null;
+    const meta = await this.pageMeta(parentId);
+    return meta ? { id: parentId, title: meta.title, icon: meta.icon } : null;
+  }
+
+  /** For a table's "Open page" button. */
+  async pageOf(key: string) {
+    const home = this.homeId;
+    return (await this.pageOfCollection(key, new Set(home ? [norm(home)] : []))) ?? null;
+  }
+
+  /** Pages to list in menus: pinned ones (NOTION_PAGES) first, then every page linked from the Notion home page. */
+  async pages(tz = 0): Promise<PageRef[]> {
+    const found = new Map<string, PageRef>();
+    const add = (p: PageRef) => { if (!found.has(norm(p.id))) found.set(norm(p.id), p); };
+    for (const c of this.pinnedPages) {
+      const m = await this.pageMeta(c.id);
+      add({ id: c.id, title: c.label ?? m?.title ?? 'Page', icon: m?.icon, iconName: c.icon, source: 'config' });
+    }
+    const walk = (bs: Block[]) => {
+      for (const b of bs) {
+        if (b.type === 'page' && b.pageId) add({ id: b.pageId, title: b.title ?? 'Untitled', icon: b.icon, source: 'home' });
+        walk(b.children ?? []);
+      }
+    };
+    walk((await this.pageFor(tz))?.blocks ?? []);
+    return [...found.values()];
+  }
+
+  /** A Notion page mirrored like Home: same blocks, live lists with each view's own filter, and sub-pages as links. */
+  async pageView(pageId: string, tz = 0) {
+    const page = await this.mirrorCached(pageId, tz);
+    const ids = [...new Set(this.viewItems(page.blocks).flatMap((i) => i.relatedIds))].slice(0, 40);
+    return { page, related: await this.resolveRelated(ids) };
+  }
+
+  private collectPageTasks(blocks: Block[], tasks: (() => Promise<unknown>)[], budget: { n: number }) {
+    for (const b of blocks) {
+      if (b.type === 'page' && b.pageId && budget.n-- > 0) {
+        const pageId = b.pageId;
+        tasks.push(async () => {
+          const m = await this.pageMeta(pageId);
+          if (m) { b.title = b.title && b.title.trim() ? b.title : m.title; b.icon = m.icon ?? b.icon; }
+        });
+      }
+      if (b.children?.length) this.collectPageTasks(b.children, tasks, budget);
+    }
   }
 
   // ----------------------------------------------------------------------------------------------
@@ -150,6 +254,8 @@ export class HomeService {
       b.collectionKey = key;
       b.viewName = def.name || undefined;
       b.viewUrl = def.url || undefined;
+      const pg = await this.pageOfCollection(key, ctx.skipPages);
+      if (pg) { b.pageId = pg.id; b.pageTitle = pg.title; }
       const withQuick = composeFilter(def.filter, def.quick);
       const attempts = [withQuick, ...(JSON.stringify(withQuick) === JSON.stringify(def.filter ?? undefined) ? [] : [def.filter ?? undefined])];
       let failure: any;
@@ -181,6 +287,8 @@ export class HomeService {
     b.collectionKey = key;
     b.preset = preset;
     b.exact = false;
+    const pg = await this.pageOfCollection(key, ctx.skipPages);
+    if (pg) { b.pageId = pg.id; b.pageTitle = pg.title; }
     try {
       const r = await this.entities.list(key, { pageSize: 10, ...presetFilters(preset, ctx.today) });
       b.items = r.items; b.hasMore = !!r.nextCursor;
@@ -226,7 +334,9 @@ export class HomeService {
         const base = { key: c.key, label: c.label, icon: c.icon, builtin: c.builtin };
         try {
           const r = await this.entities.list(c.key, { pageSize: 6 });
-          return { ...base, style: inferStyle(c.key, c.label, r.mapping), items: r.items.slice(0, 5), hasMore: r.items.length > 5 || !!r.nextCursor };
+          const home = this.homeId;
+          const pg = await this.pageOfCollection(c.key, new Set(home ? [norm(home)] : []));
+          return { ...base, style: inferStyle(c.key, c.label, r.mapping), items: r.items.slice(0, 5), hasMore: r.items.length > 5 || !!r.nextCursor, pageId: pg?.id, pageTitle: pg?.title };
         } catch (e: any) {
           this.log.warn(`Home: could not load "${c.key}"`);
           return { ...base, style: 'standard', items: [], hasMore: false, error: e?.response?.message ?? 'Could not load this table.' };
@@ -235,13 +345,13 @@ export class HomeService {
     );
   }
 
-  private async loadPage(tz: number) {
-    const id = this.cfg.get<string>('NOTION_HOME_PAGE_ID');
-    if (!id) return null;
+  private async mirror(pageId: string, tz: number): Promise<Mirror> {
+    const home = this.homeId;
     try {
-      const page = await this.notion.getPage(id);
+      const page = await this.notion.getPage(pageId);
       const titleProp = (Object.values(page.properties ?? {}) as any[]).find((p) => p.type === 'title');
-      const title = ((titleProp?.title ?? []) as any[]).map((t) => t.plain_text).join('') || 'Home';
+      const title = ((titleProp?.title ?? []) as any[]).map((t) => t.plain_text).join('') || (home && norm(home) === norm(pageId) ? 'Home' : 'Page');
+      const icon: string | undefined = page.icon?.type === 'emoji' ? page.icon.emoji : undefined;
       let calls = 0, count = 0, skipped = 0;
 
       const fetchChildren = async (blockId: string, depth: number): Promise<Block[]> => {
@@ -263,14 +373,22 @@ export class HomeService {
         return out;
       };
 
-      const blocks = await fetchChildren(id, 0);
-      const ctx: Ctx = { today: lastNDays(1, tz)[0], idMap: await this.sourceMap(), used: new Set<string>() };
+      const blocks = await fetchChildren(pageId, 0);
+      const skipPages = new Set([norm(pageId), ...(home ? [norm(home)] : [])]);
+      const ctx: Ctx = { today: lastNDays(1, tz)[0], idMap: await this.sourceMap(), used: new Set<string>(), skipPages };
       const tasks: (() => Promise<unknown>)[] = [];
       this.collectViewTasks(blocks, { heading: '' }, tasks, ctx);
+      this.collectPageTasks(blocks, tasks, { n: 12 });
       await runPool(tasks, 3); // Notion allows about 3 requests per second
-      return { title, url: page.url as string, blocks, used: [...ctx.used], skipped, truncated: calls >= MAX_BLOCK_CALLS || count >= MAX_BLOCKS, error: null as string | null };
+      return { id: pageId, title, icon, url: page.url as string, blocks, used: [...ctx.used], skipped, truncated: calls >= MAX_BLOCK_CALLS || count >= MAX_BLOCKS, error: null };
     } catch {
-      return { title: 'Home', url: null, blocks: [] as Block[], used: [] as string[], skipped: 0, truncated: false, error: 'Could not read your Notion home page. Is it shared with the integration (page → ··· → Connections)?' };
+      const isHome = !!home && norm(home) === norm(pageId);
+      return {
+        id: pageId, title: isHome ? 'Home' : 'Page', url: null, blocks: [], used: [], skipped: 0, truncated: false,
+        error: isHome
+          ? 'Could not read your Notion home page. Is it shared with the integration (page → ··· → Connections)?'
+          : 'Could not read this Notion page. Is it shared with the integration (page → ··· → Connections)?',
+      };
     }
   }
 

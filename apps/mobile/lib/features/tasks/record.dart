@@ -103,3 +103,16 @@ class RelatedInfo {
         collectionKey: j['collectionKey'] as String?,
       );
 }
+
+/// A Notion page shown as its own screen (linked from the home page, pinned, or the page a table lives on).
+class PageRef {
+  final String id, title;
+  final String? icon, iconName;
+  const PageRef({required this.id, required this.title, this.icon, this.iconName});
+  factory PageRef.fromJson(Map<String, dynamic> j) => PageRef(
+        id: j['id'] as String,
+        title: (j['title'] ?? 'Page') as String,
+        icon: j['icon'] as String?,
+        iconName: j['iconName'] as String?,
+      );
+}

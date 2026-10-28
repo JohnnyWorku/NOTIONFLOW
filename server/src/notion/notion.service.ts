@@ -138,6 +138,39 @@ export class NotionService {
     return this.call(() => this.c().blocks.children.list({ block_id: blockId, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) }));
   }
 
+  getBlock(blockId: string): Promise<any> {
+    return this.call(() => this.c().blocks.retrieve({ block_id: blockId }));
+  }
+
+  private pageOfCache = new Map<string, string | null>();
+
+  /**
+   * The page a database lives on, e.g. the "Spiritual" page that holds the Spiritual tables.
+   * Walks up through column/toggle blocks. null when the database sits in the workspace root or inside another database.
+   * Accepts a database id or a data source id.
+   */
+  async parentPageOf(id: string): Promise<string | null> {
+    if (this.pageOfCache.has(id)) return this.pageOfCache.get(id) ?? null;
+    let parent: any = null;
+    try {
+      const ds = await this.call(() => this.c().dataSources.retrieve({ data_source_id: id }));
+      parent = ds.database_parent ?? null;
+      if (!parent && ds.parent?.database_id) {
+        parent = (await this.call(() => this.c().databases.retrieve({ database_id: ds.parent.database_id }))).parent;
+      }
+    } catch {
+      parent = (await this.call(() => this.c().databases.retrieve({ database_id: id }))).parent;
+    }
+    let result: string | null = null;
+    for (let hops = 0; parent && hops < 6; hops++) {
+      if (parent.type === 'page_id') { result = parent.page_id as string; break; }
+      if (parent.type !== 'block_id') break;
+      parent = (await this.getBlock(parent.block_id)).parent;
+    }
+    this.pageOfCache.set(id, result); // only reached when no call failed
+    return result;
+  }
+
   /** Resolved queryable id for a configured database id, if its schema was already loaded. */
   cachedSourceId(id: string): string | undefined {
     return this.cache.get(id)?.id;

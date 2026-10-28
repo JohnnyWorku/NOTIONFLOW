@@ -98,12 +98,19 @@ else {
       const what = b.error ? `ERROR: ${b.error}`
         : b.collectionKey ? `${b.collectionKey} · ${b.exact ? `EXACT Notion view${b.viewName ? ` “${b.viewName}”` : ''}` : 'approximate (guessed from the heading)'} · ${b.items?.length ?? 0} item(s)`
         : 'not matched to any table';
-      (b.error || !b.collectionKey ? bad : ok)(`${(b.heading ?? '').trim() || '(no heading)'} → ${what}`);
+      (b.error || !b.collectionKey ? bad : ok)(`${(b.heading ?? '').trim() || '(no heading)'} → ${what}${b.pageTitle ? ` · lives on page “${b.pageTitle}”` : ''}`);
     }
     if (dbs.some((b) => b.collectionKey && !b.exact)) info('"approximate" means the Notion Views API could not be used for that block (see docs/notion-setup.md, step 8).');
   }
   else info('No NOTION_HOME_PAGE_ID set (optional).');
 }
+console.log('\n5b. Pages (/pages): pinned pages and pages linked from your Notion home page');
+const pg = await call('/pages', { token });
+if (outdated(pg)) bad('Backend is OLD: no /pages route. Redeploy/restart the backend.');
+else if (pg.status !== 200) bad(`returned ${pg.status}: ${pg.json?.message ?? ''}`);
+else if (!(pg.json ?? []).length) info('none yet (add a page link to your Notion home page, or set NOTION_PAGES)');
+else for (const x of pg.json) ok(`${x.icon ? x.icon + ' ' : ''}${x.title}  (${x.source === 'config' ? 'pinned' : 'linked from your Notion home page'})`);
+
 if (web) {
   console.log('\n6. Web app (' + web + ')');
   try {
@@ -129,7 +136,7 @@ if (web) {
       if (!cookie) bad('web sign-in worked but sent no session cookie');
       else {
         ok('web sign-in works');
-        for (const route of ['health', 'collections', 'dashboard', 'home', 'stats']) {
+        for (const route of ['health', 'collections', 'dashboard', 'home', 'pages', 'stats']) {
           const r = await fetch(`${web}/api/proxy/${route}`, { headers: { cookie }, signal: AbortSignal.timeout(90_000) });
           if (r.status === 200) ok(`web → backend /${route}: 200`);
           else if (r.status === 404) bad(`web → backend /${route}: 404 → the web app is running OLD code (its proxy does not allow "${route}")`);

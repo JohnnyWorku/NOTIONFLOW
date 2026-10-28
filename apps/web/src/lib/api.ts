@@ -32,9 +32,16 @@ export interface Block {
   items?: NfRecord[]; hasMore?: boolean; heading?: string; preset?: string;
   /** exact = filter and sorts come from the real Notion view; otherwise guessed from the heading. */
   exact?: boolean; viewName?: string; viewUrl?: string; style?: CardStyle; error?: string;
+  /** page blocks: the Notion page to open in the app. database blocks: the page that table lives on. */
+  pageId?: string; pageTitle?: string;
 }
 export interface Related { id: string; title: string; status: string | null; url: string; collectionKey?: string }
-export interface HomeSection { key: string; label: string; icon?: string; builtin: boolean; style: CardStyle; items: NfRecord[]; hasMore: boolean; error?: string }
+export interface HomeSection { key: string; label: string; icon?: string; builtin: boolean; style: CardStyle; items: NfRecord[]; hasMore: boolean; error?: string; pageId?: string; pageTitle?: string }
+export interface PageRef { id: string; title: string; icon?: string; iconName?: string; source: 'home' | 'config' }
+export interface PageData {
+  page: { id: string; title: string; icon?: string; url: string | null; blocks: Block[]; used: string[]; skipped: number; truncated: boolean; error: string | null };
+  related: Record<string, Related>;
+}
 export interface HomeData {
   generatedAt: string;
   page: { title: string; url: string | null; blocks: Block[]; used: string[]; skipped: number; truncated: boolean; error: string | null } | null;

@@ -9,8 +9,9 @@ import 'home_models.dart';
 class NotionBlocksView extends StatelessWidget {
   final List<Block> blocks;
   final void Function(Block) onOpen;
+  final void Function(String pageId)? onOpenPage;
   final Map<String, RelatedInfo> related;
-  const NotionBlocksView({super.key, required this.blocks, required this.onOpen, this.related = const {}});
+  const NotionBlocksView({super.key, required this.blocks, required this.onOpen, this.onOpenPage, this.related = const {}});
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +45,7 @@ class NotionBlocksView extends StatelessWidget {
   }
 
   Widget _nested(Block b) =>
-      b.children.isEmpty ? const SizedBox.shrink() : Padding(padding: const EdgeInsets.only(left: 18, top: 6), child: NotionBlocksView(blocks: b.children, onOpen: onOpen, related: related));
+      b.children.isEmpty ? const SizedBox.shrink() : Padding(padding: const EdgeInsets.only(left: 18, top: 6), child: NotionBlocksView(blocks: b.children, onOpen: onOpen, onOpenPage: onOpenPage, related: related));
 
   static const _empty = {
     'today': 'Nothing due today.',
@@ -80,6 +81,7 @@ class NotionBlocksView extends StatelessWidget {
           ),
       Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
         if (b.collectionKey != null) TextButton(onPressed: () => onOpen(b), child: const Text('Open table')),
+        if (b.pageId != null && onOpenPage != null) TextButton(onPressed: () => onOpenPage!(b.pageId!), child: Text('Open ${b.pageTitle ?? 'the'} page')),
         if (b.viewUrl != null) TextButton(onPressed: () => launchUrl(Uri.parse(b.viewUrl!), mode: LaunchMode.externalApplication), child: Text(b.hasMore ? 'See the rest in Notion' : 'Open this view in Notion')),
       ]),
       Text(caption, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.outline)),
@@ -88,6 +90,18 @@ class NotionBlocksView extends StatelessWidget {
 
   Widget _tile(BuildContext context, Block b) {
     final cs = Theme.of(context).colorScheme;
+    if (b.type == 'page' && b.pageId != null && onOpenPage != null) {
+      return AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        onTap: () => onOpenPage!(b.pageId!),
+        child: Row(children: [
+          b.icon != null ? Text(b.icon!, style: const TextStyle(fontSize: 22)) : Icon(Icons.description_outlined, color: cs.primary, size: 22),
+          const SizedBox(width: 12),
+          Expanded(child: Text(b.title ?? 'Untitled', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Icon(Icons.chevron_right, size: 18, color: cs.outline),
+        ]),
+      );
+    }
     final label = b.title ?? (b.heading != null && b.heading!.trim().isNotEmpty ? 'Open “${b.heading!.trim()}” in Notion' : (b.collectionKey != null ? 'Open table' : 'Open in Notion'));
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -158,15 +172,15 @@ class NotionBlocksView extends StatelessWidget {
             tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.only(left: 12),
             title: Text.rich(_span(context, b.text, base: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600))),
-            children: [NotionBlocksView(blocks: b.children, onOpen: onOpen, related: related)],
+            children: [NotionBlocksView(blocks: b.children, onOpen: onOpen, onOpenPage: onOpenPage, related: related)],
           ),
         );
       case 'columns':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (final c in b.children) NotionBlocksView(blocks: c.children, onOpen: onOpen, related: related),
+          for (final c in b.children) NotionBlocksView(blocks: c.children, onOpen: onOpen, onOpenPage: onOpenPage, related: related),
         ]);
       case 'column':
-        return NotionBlocksView(blocks: b.children, onOpen: onOpen, related: related);
+        return NotionBlocksView(blocks: b.children, onOpen: onOpen, onOpenPage: onOpenPage, related: related);
       case 'database':
         return (b.items != null || b.error != null) ? _live(context, b) : _tile(context, b);
       case 'page':

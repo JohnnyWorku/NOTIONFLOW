@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export const maxDuration = 60; // free backends can take up to a minute to wake up
 
-const ALLOWED = new Set(['tasks', 'projects', 'goals', 'learning', 'c', 'collections', 'home', 'dashboard', 'stats', 'sync', 'notion', 'health']);
+const ALLOWED = new Set(['tasks', 'projects', 'goals', 'learning', 'c', 'collections', 'home', 'pages', 'dashboard', 'stats', 'sync', 'notion', 'health']);
 
 async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;

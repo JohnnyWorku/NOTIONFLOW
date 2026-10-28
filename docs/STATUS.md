@@ -35,6 +35,12 @@ Notion-driven Status/Priority dropdowns, edit + delete + load-more on web and mo
 - Executed here: the real HomeService/CollectionsService logic against a fake Notion modelled on your page (exact filter + sorts, auto-discovery, unshared database, API-unavailable fallback, section de-duplication, relations, caching, cold-start discovery) and the pure helpers. Not executed: Nest build, web build, Flutter analyze/test, and any call to the real Notion Views API.
 - Unverified assumption: the Views API calls are made with the SDK's generic `request()` (GET /views?database_id=<database block id>, GET /views/{id}); field names follow Notion's current docs. `node scripts/diagnose.mjs` reports per view whether it was EXACT.
 
+## 0.5.0 changes
+- Every record card now uses the Goals look; accent colour + icon identify the table. Web and mobile.
+- Pages: any Notion page (linked from the home page, pinned with NOTION_PAGES, or the page a table lives on) opens as a screen that mirrors it with live exact-filter lists. Sub-pages open in the app.
+- Executed here: the real HomeService against a fake Notion for pages (parent page of a table, page index with titles and emoji, page mirror without self-link, invalid NOTION_PAGES). Not executed: Nest build/Jest, web build, Flutter analyze/test, real Notion calls.
+- Unverified assumption: finding a table's parent page uses `database_parent` on a data source (falling back to the database's `parent`, and walking up block parents). If your Notion returns it differently, the "Page" button simply does not appear; pinned and linked pages still work.
+
 ## Known limits
 - Task completion day is estimated from last edit (Notion stores no completion time).
 - Statistics read up to 300 records per table.

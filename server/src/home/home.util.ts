@@ -10,6 +10,8 @@ export interface Block {
   items?: unknown[]; hasMore?: boolean; heading?: string; preset?: Preset;
   /** true = the filter/sorts were read from the real Notion view; false/undefined = guessed from the heading. */
   exact?: boolean; viewName?: string; viewUrl?: string; style?: CardStyle; error?: string;
+  /** page blocks: the Notion page to open in the app. database blocks: the page that table lives on. */
+  pageId?: string; pageTitle?: string;
 }
 import type { CardStyle } from '../entities/mapping';
 
@@ -63,12 +65,12 @@ export function convertBlock(b: any, match: Matcher): Block | null {
       return { id, type: 'database', title, url: notionUrl(id), collectionKey: match({ id, title }) };
     }
     case 'child_page':
-      return { id, type: 'page', title: v.title, url: notionUrl(id) };
+      return { id, type: 'page', title: v.title, url: notionUrl(id), pageId: id };
     case 'link_to_page': {
       const target: string | undefined = v.database_id ?? v.page_id;
       if (!target) return null;
       const key = v.database_id ? match({ id: target }) : undefined;
-      return { id, type: key ? 'database' : 'page', url: notionUrl(target), collectionKey: key };
+      return { id, type: key ? 'database' : 'page', url: notionUrl(target), collectionKey: key, pageId: key ? undefined : target };
     }
     case 'bookmark': {
       if (!v.url) return null;

@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CalendarClock, CalendarDays, ExternalLink, Flame, GraduationCap, FolderKanban, Target, type LucideIcon } from 'lucide-react';
-import { api, Collection, HomeData, NfRecord, Related } from '@/lib/api';
+import { api, Collection, HomeData, NfRecord, PageRef, Related } from '@/lib/api';
+import { PageCard } from '@/components/page-card';
 import { greeting, type Tone } from '@/lib/format';
 import { useStats } from '@/lib/hooks';
 import { iconFor } from '@/lib/icons';
@@ -113,6 +114,7 @@ export default function Home() {
   const dash = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dash>('dashboard') });
   const home = useQuery({ queryKey: ['home'], queryFn: () => api<HomeData>(`home?tz=${-new Date().getTimezoneOffset()}`) });
   const cols = useQuery({ queryKey: ['collections'], queryFn: () => api<Collection[]>('collections'), staleTime: 5 * 60_000 });
+  const pages = useQuery({ queryKey: ['pages'], queryFn: () => api<PageRef[]>(`pages?tz=${-new Date().getTimezoneOffset()}`), staleTime: 5 * 60_000, retry: false });
   const qc = useQueryClient();
   // Tables added to your Notion home page are registered while Home loads: refresh the menus so they appear.
   useEffect(() => {
@@ -161,6 +163,15 @@ export default function Home() {
 
       <Performance />
 
+      {(pages.data ?? []).length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold text-slate-700">Pages</h2>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {pages.data!.map((pg) => <PageCard key={pg.id} id={pg.id} title={pg.title} icon={pg.icon} iconName={pg.iconName} />)}
+          </div>
+        </section>
+      )}
+
       {page && <NotionHome page={page} related={home.data?.related ?? {}} />}
 
       {mirrored ? (
@@ -184,7 +195,10 @@ export default function Home() {
                 <div key={s.key} className="card space-y-3 !p-4">
                   <div className="flex items-center justify-between">
                     <h3 className="flex items-center gap-2 font-semibold"><Icon size={18} className="text-indigo-600" /> {s.label}</h3>
-                    <Link href={`/c/${s.key}`} className="text-sm font-medium text-indigo-600 hover:underline">{s.hasMore ? 'View all →' : 'Open →'}</Link>
+                    <span className="flex items-center gap-4">
+                      {s.pageId && <Link href={`/p/${s.pageId}`} className="text-sm font-medium text-indigo-600 hover:underline">Open page →</Link>}
+                      <Link href={`/c/${s.key}`} className="text-sm font-medium text-indigo-600 hover:underline">{s.hasMore ? 'View all →' : 'Open →'}</Link>
+                    </span>
                   </div>
                   {s.error ? <p className="text-sm text-rose-700">{s.error}</p> : s.items.length === 0 ? <p className="text-sm text-slate-500">Nothing here yet.</p> : (
                     <ul className="space-y-2">{s.items.map((r) => <RecordRow key={r.id} r={r} dense variant={s.style} related={relatedFor(r)} />)}</ul>

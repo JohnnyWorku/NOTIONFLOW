@@ -2,6 +2,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Inbox, Plus, X } from 'lucide-react';
+import Link from 'next/link';
+import { FileText } from 'lucide-react';
 import { api, ApiError, Meta, NfRecord, Page } from '@/lib/api';
 import { useDebounced } from '@/lib/hooks';
 import { Empty, ErrorBox, Loading, PageHeader } from './ui';
@@ -19,6 +21,7 @@ export function CollectionView({ ckey, title, subtitle }: { ckey: string; title:
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const pageOf = useQuery({ queryKey: ['page-of', ckey], queryFn: () => api<{ id: string; title: string; icon?: string } | null>(`home/page-of/${ckey}`), staleTime: 10 * 60_000, retry: false });
   const meta = useQuery({ queryKey: ['meta', ckey], queryFn: () => api<Meta>(`c/${ckey}/meta`), staleTime: 5 * 60_000 });
   const list = useInfiniteQuery({
     queryKey: ['c', ckey, q, overdue],
@@ -50,7 +53,12 @@ export function CollectionView({ ckey, title, subtitle }: { ckey: string; title:
     <div className="space-y-6">
       <PageHeader
         title={title} subtitle={subtitle}
-        action={<button className="btn" onClick={() => setDialog({})}><Plus size={16} /> New</button>}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {pageOf.data && <Link href={`/p/${pageOf.data.id}`} className="btn-ghost"><FileText size={16} /> {pageOf.data.icon ? `${pageOf.data.icon} ` : ''}{pageOf.data.title} page</Link>}
+            <button className="btn" onClick={() => setDialog({})}><Plus size={16} /> New</button>
+          </div>
+        }
       />
 
       <div className="flex flex-wrap items-center gap-3">

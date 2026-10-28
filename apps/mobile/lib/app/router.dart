@@ -5,6 +5,7 @@ import '../core/config/settings.dart';
 import '../features/auth/login_screen.dart';
 import '../features/collections/collections_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/pages/notion_page_screen.dart';
 import '../features/records/records_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/stats/stats_screen.dart';
@@ -46,7 +47,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             GoRoute(
               path: '/collections',
               builder: (_, __) => const CollectionsScreen(),
-              routes: [GoRoute(path: ':key', builder: (_, state) => RecordsScreen(kind: state.pathParameters['key']!))],
+              routes: [
+                GoRoute(path: 'page/:id', builder: (_, state) => NotionPageScreen(id: state.pathParameters['id']!)),
+                GoRoute(path: ':key', builder: (_, state) => RecordsScreen(kind: state.pathParameters['key']!)),
+              ],
             ),
           ]),
           StatefulShellBranch(routes: [GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen())]),

@@ -47,6 +47,20 @@ class RecordsRepository {
   Future<Map<String, dynamic>> home(int tzMinutes) async =>
       (await api.request('GET', '/home', query: {'tz': tzMinutes})) as Map<String, dynamic>;
 
+  Future<List<PageRef>> pages(int tzMinutes) async {
+    final data = await api.request('GET', '/pages', query: {'tz': tzMinutes});
+    return (data as List).map((e) => PageRef.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<Map<String, dynamic>> pageView(String id, int tzMinutes) async =>
+      (await api.request('GET', '/pages/$id', query: {'tz': tzMinutes})) as Map<String, dynamic>;
+
+  /// The Notion page a table lives on, or null (the server answers with an empty body then).
+  Future<PageRef?> pageOf(String key) async {
+    final data = await api.request('GET', '/home/page-of/$key');
+    return data is Map<String, dynamic> ? PageRef.fromJson(data) : null;
+  }
+
   Future<Map<String, dynamic>> dashboard() async => (await api.request('GET', '/dashboard')) as Map<String, dynamic>;
 
   Future<Map<String, dynamic>> stats(int days, int tzMinutes) async =>
@@ -68,6 +82,10 @@ final syncTickProvider = StreamProvider<int>((ref) async* {
 
 /// Only changes when the server version changes, so dependents refetch exactly when needed.
 final syncVersionProvider = Provider<int?>((ref) => ref.watch(syncTickProvider).valueOrNull);
+
+final pagesProvider = FutureProvider<List<PageRef>>((ref) => ref.watch(recordsRepoProvider).pages(DateTime.now().timeZoneOffset.inMinutes));
+
+final pageOfProvider = FutureProvider.family<PageRef?, String>((ref, key) => ref.watch(recordsRepoProvider).pageOf(key));
 
 final collectionsProvider = FutureProvider<List<CollectionInfo>>((ref) => ref.watch(recordsRepoProvider).collections());
 
