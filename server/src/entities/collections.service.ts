@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
-import { FieldMap } from './mapping';
+import { CARD_STYLES, CardStyle, FieldMap, inferStyle } from './mapping';
 import { slugify } from '../home/home.util';
 
 const norm = (s?: string) => (s ?? '').replace(/-/g, '').toLowerCase();
@@ -16,6 +16,8 @@ export interface Collection {
   fields?: FieldMap;
   /** true = found automatically on the Notion home page (not listed in the server settings). */
   discovered?: boolean;
+  /** Force a card design for this table (otherwise it is inferred from the table's name and properties). */
+  card?: CardStyle;
 }
 
 const BUILTIN: [string, string, string, string][] = [
@@ -35,6 +37,7 @@ const FIELD_KEYS = ['title', 'status', 'priority', 'due', 'done', 'relation', 'p
 @Injectable()
 export class CollectionsService {
   private readonly items: Collection[] = [];
+  private cardOverrides: Record<string, CardStyle> = {};
   private discovered: Collection[] = [];
   private discoverer?: () => Promise<void>;
   private lastDiscovery = 0;
@@ -46,6 +49,27 @@ export class CollectionsService {
     const path = cfg.get<string>('NOTION_COLLECTIONS_PATH');
     const raw = cfg.get<string>('NOTION_COLLECTIONS') || (path ? readFileSync(path, 'utf8') : '');
     if (raw.trim()) this.addExtras(raw);
+    const cards = cfg.get<string>('NOTION_CARD_STYLES');
+    if (cards?.trim()) this.parseCardStyles(cards);
+  }
+
+  /** NOTION_CARD_STYLES: {"spiritual":"habit","reading":"learning"} forces a design for any table, including discovered ones. */
+  private parseCardStyles(raw: string) {
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); } catch { throw new Error('NOTION_CARD_STYLES is not valid JSON.'); }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('NOTION_CARD_STYLES must be a JSON object like {"spiritual":"habit"}.');
+    for (const [key, style] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof style !== 'string' || !(CARD_STYLES as readonly string[]).includes(style)) {
+        throw new Error(`NOTION_CARD_STYLES.${key} must be one of: ${CARD_STYLES.join(', ')}.`);
+      }
+      this.cardOverrides[key] = style as CardStyle;
+    }
+  }
+
+  /** The card design for a table: your override, else the table's own "card" setting, else inferred. */
+  styleFor(key: string, fields: FieldMap): CardStyle {
+    const c = this.get(key);
+    return this.cardOverrides[key] ?? c?.card ?? inferStyle(key, c?.label ?? key, fields);
   }
 
   private addExtras(raw: string) {
@@ -71,7 +95,11 @@ export class CollectionsService {
         }
         fields = c.fields as FieldMap;
       }
+      if (c.card !== undefined && !(CARD_STYLES as readonly string[]).includes(c.card)) {
+        throw new Error(`${where}.card must be one of: ${CARD_STYLES.join(', ')}.`);
+      }
       this.items.push({
+        card: c.card as CardStyle | undefined,
         key: c.key, label: c.label.trim(), databaseId: c.databaseId.trim(), builtin: false,
         icon: typeof c.icon === 'string' ? c.icon : undefined,
         description: typeof c.description === 'string' ? c.description : undefined,

@@ -41,6 +41,7 @@ Set one line (a JSON array) as `NOTION_COLLECTIONS` in `server/.env` (local) or 
 - `key`: lowercase letters, digits, dashes (max 30). It becomes the URL (`/c/spiritual`). Must be unique and cannot reuse
   `tasks`, `projects`, `goals`, `learning`.
 - `label`, `databaseId`: required. `icon`: one of `check folder target book sparkles heart dumbbell wallet moon sun star leaf brain`.
+- `card` (optional): force the card design: `task`, `project`, `goal`, `learning`, `habit`, `note` or `standard`. Otherwise it is chosen from the table's name and properties.
 - `fields` (optional): override auto-detection with your real property names. Allowed keys:
   `title status priority due done relation progress notes amount`.
 - In `.env` write it on ONE line; or keep it in a file and set `NOTION_COLLECTIONS_PATH=./collections.json` (local only).

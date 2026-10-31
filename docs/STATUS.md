@@ -41,6 +41,12 @@ Notion-driven Status/Priority dropdowns, edit + delete + load-more on web and mo
 - Executed here: the real HomeService against a fake Notion for pages (parent page of a table, page index with titles and emoji, page mirror without self-link, invalid NOTION_PAGES). Not executed: Nest build/Jest, web build, Flutter analyze/test, real Notion calls.
 - Unverified assumption: finding a table's parent page uses `database_parent` on a data source (falling back to the database's `parent`, and walking up block parents). If your Notion returns it differently, the "Page" button simply does not appear; pinned and linked pages still work.
 
+## 0.6.0 changes
+- Seven distinct card layouts, one per kind of table (task, project, goal, learning, habit/log, note, standard), web and mobile. The Goals card is unchanged. 0.5.0's "same card, different colour" was a misreading and is replaced.
+- Per-table override: `NOTION_CARD_STYLES` or `"card"` in `NOTION_COLLECTIONS`.
+- NotionFlow icon (favicon, Apple touch icon, installable-app icons, manifest) on the web app, drawn from the logo's geometry; icons are served before sign-in.
+- Executed here: style inference and overrides (Node), icon rendering (checked visually against your logo). Not executed: web build, Flutter analyze/test, Jest. Card layouts themselves have not been seen in a browser or on a phone by me.
+
 ## Known limits
 - Task completion day is estimated from last edit (Notion stores no completion time).
 - Statistics read up to 300 records per table.

@@ -14,7 +14,7 @@ class HealthController {
       status: 'ok',
       time: new Date().toISOString(),
       notionConfigured: this.notion.configured,
-      version: '0.5.0',
+      version: '0.6.0',
       commit: (process.env.RENDER_GIT_COMMIT ?? '').slice(0, 7) || null,
     };
   }

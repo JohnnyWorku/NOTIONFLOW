@@ -1,7 +1,7 @@
 // Plain Dart models (no code generation) mirroring the backend contract.
 
 /// Which card design a table gets (decided by the server from the table's name and properties).
-enum CardStyle { task, project, goal, learning, habit, standard }
+enum CardStyle { task, project, goal, learning, habit, note, standard }
 
 CardStyle cardStyleFrom(String? s) => CardStyle.values.firstWhere((e) => e.name == s, orElse: () => CardStyle.standard);
 

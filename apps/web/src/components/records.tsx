@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { BookOpen, Calendar, Check, CheckCircle2, ExternalLink, FileText, FolderKanban, Hourglass, Link2, Pencil, Search, Sparkles, Target, type LucideIcon } from 'lucide-react';
+import { BookOpen, Calendar, Check, ExternalLink, FolderKanban, Hourglass, Link2, Pencil, Search, StickyNote, Target } from 'lucide-react';
 import type { CardStyle, NfRecord, Related } from '@/lib/api';
 import { formatDue, priorityTone, statusTone } from '@/lib/format';
 import { Pill } from './ui';
@@ -19,23 +19,9 @@ export function RelatedChips({ items }: { items: Related[] }) {
 
 interface RowProps {
   r: NfRecord; leading?: React.ReactNode; dense?: boolean; onEdit?: () => void; related?: Related[];
-  /** Which table this record belongs to. Every table uses the same card; the accent colour and icon differ. */
+  /** Which table design to use. Every kind of table has its own layout. */
   variant?: CardStyle;
 }
-
-interface Palette { card: string; circle: string; ringTrack: string; ringStroke: string; ringText: string; icon: LucideIcon }
-
-// One card design (the Goals look), one accent per kind of table. Class names are written out in full so Tailwind keeps them.
-const ACCENT: Record<CardStyle, Palette> = {
-  task: { card: 'border-indigo-100 from-white to-indigo-50/70', circle: 'bg-indigo-100 text-indigo-600', ringTrack: 'stroke-indigo-100', ringStroke: 'stroke-indigo-500', ringText: 'text-indigo-700', icon: CheckCircle2 },
-  project: { card: 'border-violet-100 from-white to-violet-50/70', circle: 'bg-violet-100 text-violet-600', ringTrack: 'stroke-violet-100', ringStroke: 'stroke-violet-500', ringText: 'text-violet-700', icon: FolderKanban },
-  goal: { card: 'border-emerald-100 from-white to-emerald-50/70', circle: 'bg-emerald-100 text-emerald-600', ringTrack: 'stroke-emerald-100', ringStroke: 'stroke-emerald-500', ringText: 'text-emerald-700', icon: Target },
-  learning: { card: 'border-sky-100 from-white to-sky-50/70', circle: 'bg-sky-100 text-sky-600', ringTrack: 'stroke-sky-100', ringStroke: 'stroke-sky-500', ringText: 'text-sky-700', icon: BookOpen },
-  habit: { card: 'border-teal-100 from-white to-teal-50/70', circle: 'bg-teal-100 text-teal-700', ringTrack: 'stroke-teal-100', ringStroke: 'stroke-teal-500', ringText: 'text-teal-700', icon: Sparkles },
-  standard: { card: 'border-slate-200 from-white to-slate-50', circle: 'bg-slate-100 text-slate-500', ringTrack: 'stroke-slate-200', ringStroke: 'stroke-slate-500', ringText: 'text-slate-700', icon: FileText },
-};
-const OVERDUE: Palette = { card: 'border-rose-200 from-white to-rose-50/80', circle: 'bg-rose-100 text-rose-600', ringTrack: 'stroke-rose-100', ringStroke: 'stroke-rose-500', ringText: 'text-rose-700', icon: CheckCircle2 };
-const DONE: Palette = { ...ACCENT.goal, icon: Check };
 
 const isDone = (r: NfRecord) => r.done === true || (r.status ? /done|complete/i.test(r.status) : false);
 const dayParts = (ymd: string) => {
@@ -43,61 +29,233 @@ const dayParts = (ymd: string) => {
   return { month: new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short' }), day: d };
 };
 
-function Ring({ value, p }: { value: number; p: Palette }) {
-  const size = 54, stroke = 6, rad = (size - stroke) / 2, c = 2 * Math.PI * rad, v = Math.max(0, Math.min(100, value));
+function Actions({ r, onEdit, light }: { r: NfRecord; onEdit?: () => void; light?: boolean }) {
+  const btn = light ? 'rounded-md p-1.5 text-white/80 transition hover:bg-white/20 hover:text-white' : 'rounded-md p-1.5 text-slate-400 transition hover:bg-black/5 hover:text-slate-700';
   return (
-    <div className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`${Math.round(v)}%`}>
-        <circle cx={size / 2} cy={size / 2} r={rad} fill="none" strokeWidth={stroke} className={p.ringTrack} />
-        <circle cx={size / 2} cy={size / 2} r={rad} fill="none" strokeWidth={stroke} strokeLinecap="round" className={p.ringStroke}
-          strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-      </svg>
-      <span className={`absolute text-xs font-bold tabular-nums ${p.ringText}`}>{Math.round(v)}%</span>
+    <div className="flex shrink-0 items-center">
+      {onEdit && <button onClick={onEdit} aria-label={`Edit ${r.title}`} className={btn}><Pencil size={16} /></button>}
+      <a href={r.url} target="_blank" rel="noreferrer" aria-label={`Open ${r.title} in Notion`} className={btn}><ExternalLink size={16} /></a>
     </div>
   );
 }
 
-/** One record. The same rounded gradient card for every table; colour and icon say which table it is. */
-export function RecordRow({ r, leading, dense, onEdit, related, variant = 'standard' }: RowProps) {
+function Title({ r, done, className = '' }: { r: NfRecord; done: boolean; className?: string }) {
+  return <p className={`truncate font-semibold ${done ? 'text-slate-400 line-through' : 'text-slate-900'} ${className}`}>{r.title}</p>;
+}
+
+function MiniRing({ value }: { value: number }) {
+  const size = 54, stroke = 6, rad = (size - stroke) / 2, c = 2 * Math.PI * rad, v = Math.max(0, Math.min(100, value));
+  return (
+    <div className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`${Math.round(v)}%`}>
+        <circle cx={size / 2} cy={size / 2} r={rad} fill="none" strokeWidth={stroke} className="stroke-emerald-100" />
+        <circle cx={size / 2} cy={size / 2} r={rad} fill="none" strokeWidth={stroke} strokeLinecap="round" className="stroke-emerald-500"
+          strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      </svg>
+      <span className="absolute text-xs font-bold tabular-nums text-emerald-700">{Math.round(v)}%</span>
+    </div>
+  );
+}
+
+function Bar({ value, track, fill, height = 'h-2' }: { value: number; track: string; fill: string; height?: string }) {
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <div className={`${height} overflow-hidden rounded-full ${track}`} role="progressbar" aria-valuenow={Math.round(v)} aria-valuemin={0} aria-valuemax={100}>
+      <div className={`h-full rounded-full ${fill} transition-all`} style={{ width: `${v}%` }} />
+    </div>
+  );
+}
+
+/** TASKS: a colour stripe for urgency, checkbox in front, the due date as a badge on the right. */
+function TaskCard({ r, leading, dense, onEdit, related }: RowProps) {
   const done = isDone(r);
   const due = r.due ? formatDue(r.due, done) : null;
-  const p = variant === 'task' && done ? DONE : variant === 'task' && due?.overdue ? OVERDUE : ACCENT[variant];
-  const Icon = p.icon;
-  const dueLabel = due ? `${variant === 'goal' ? 'Target ' : variant === 'project' ? 'Deadline ' : ''}${due.label}` : '';
-  const when = variant === 'habit' ? dayParts(r.due ?? r.created) : null;
-
-  const circle = r.progress !== null ? <Ring value={r.progress} p={p} />
-    : when ? (
-      <div className={`flex h-[54px] w-[54px] shrink-0 flex-col items-center justify-center rounded-full ${p.circle}`} aria-label={`${when.month} ${when.day}`}>
-        <span className="text-[9px] font-semibold uppercase leading-none tracking-wide">{when.month}</span>
-        <span className="text-lg font-bold leading-tight tabular-nums">{when.day}</span>
-      </div>
-    ) : <span className={`grid h-[54px] w-[54px] shrink-0 place-items-center rounded-full ${p.circle}`}><Icon size={22} /></span>;
-
-  const btn = 'rounded-md p-1.5 text-slate-400 transition hover:bg-white/70 hover:text-slate-700';
+  const pt = priorityTone(r.priority);
+  const stripe = done ? 'bg-emerald-400' : due?.overdue || pt === 'red' ? 'bg-rose-500' : pt === 'amber' ? 'bg-amber-400' : 'bg-indigo-300';
+  const when = r.due ? dayParts(r.due) : null;
+  const badge = done ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : due?.overdue ? 'bg-rose-50 text-rose-700 ring-rose-200' : due?.today ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-slate-50 text-slate-600 ring-slate-200';
   return (
-    <li className={`flex items-center gap-4 rounded-2xl border bg-gradient-to-br transition hover:shadow-md ${p.card} ${dense ? 'p-3' : 'p-4'}`}>
+    <li className={`relative flex items-center gap-3 overflow-hidden rounded-xl border border-slate-200 bg-white pr-2 transition hover:shadow-sm ${dense ? 'py-2.5 pl-4' : 'py-3.5 pl-5'}`}>
+      <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${stripe}`} />
       {leading}
-      {circle}
       <div className="min-w-0 flex-1">
-        <p className={`truncate font-semibold ${done ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{r.title}</p>
-        {(r.status || r.priority || due || (r.amount !== null && variant !== 'habit')) && (
+        <Title r={r} done={done} />
+        {(r.priority || r.status) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {due && <Pill tone={due.overdue ? 'red' : due.today ? 'amber' : 'slate'}><Calendar size={12} /> {dueLabel}</Pill>}
-            {r.priority && <Pill tone={priorityTone(r.priority)}>{r.priority}</Pill>}
+            {r.priority && <Pill tone={pt}>{r.priority}</Pill>}
             {r.status && <Pill tone={statusTone(r.status)}>{r.status}</Pill>}
-            {r.amount !== null && variant !== 'habit' && <Pill tone="violet"><Hourglass size={12} /> {r.amount}</Pill>}
           </div>
         )}
         {related && <RelatedChips items={related} />}
       </div>
-      {r.amount !== null && variant === 'habit' && <p className={`shrink-0 px-1 text-2xl font-bold tabular-nums ${p.ringText}`}>{r.amount}</p>}
-      <div className="flex shrink-0 items-center">
-        {onEdit && <button onClick={onEdit} aria-label={`Edit ${r.title}`} className={btn}><Pencil size={16} /></button>}
-        <a href={r.url} target="_blank" rel="noreferrer" aria-label={`Open ${r.title} in Notion`} className={btn}><ExternalLink size={16} /></a>
+      {when && (
+        <div className={`flex w-14 shrink-0 flex-col items-center rounded-xl py-1.5 ring-1 ${badge}`} aria-label={due?.label}>
+          <span className="text-[10px] font-semibold uppercase leading-none tracking-wide">{done ? 'Done' : due?.overdue ? 'Overdue' : due?.today ? 'Today' : when.month}</span>
+          <span className="text-lg font-bold leading-tight tabular-nums">{when.day}</span>
+        </div>
+      )}
+      <Actions r={r} onEdit={onEdit} />
+    </li>
+  );
+}
+
+/** PROJECTS: a gradient header with the name and status, then deadline and a thick progress bar. */
+function ProjectCard({ r, leading, dense, onEdit, related }: RowProps) {
+  const done = isDone(r);
+  const due = r.due ? formatDue(r.due, done) : null;
+  return (
+    <li className="overflow-hidden rounded-2xl border border-violet-100 bg-white transition hover:shadow-md">
+      <div className="flex items-center gap-3 bg-gradient-to-r from-violet-500 to-indigo-600 px-4 py-3 text-white">
+        {leading}
+        <FolderKanban size={18} className="shrink-0" />
+        <p className={`min-w-0 flex-1 truncate font-semibold ${done ? 'line-through opacity-70' : ''}`}>{r.title}</p>
+        {r.status && <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium">{r.status}</span>}
+        <Actions r={r} onEdit={onEdit} light />
+      </div>
+      <div className={`space-y-2.5 px-4 ${dense ? 'py-3' : 'py-3.5'}`}>
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span className={`inline-flex items-center gap-1 ${due?.overdue ? 'font-medium text-rose-600' : ''}`}><Calendar size={12} /> {due ? `Deadline ${due.label}` : 'No deadline'}</span>
+          {r.progress !== null && <span className="font-semibold tabular-nums text-violet-700">{Math.round(r.progress)}%</span>}
+        </div>
+        {r.progress !== null && <Bar value={r.progress} track="bg-violet-100" fill="bg-gradient-to-r from-violet-500 to-indigo-500" height="h-2.5" />}
+        {related && <RelatedChips items={related} />}
       </div>
     </li>
   );
+}
+
+/** GOALS: the progress ring (or a target icon) on a soft green card. */
+function GoalCard({ r, leading, dense, onEdit, related }: RowProps) {
+  const done = isDone(r);
+  const due = r.due ? formatDue(r.due, done) : null;
+  return (
+    <li className={`flex items-center gap-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/70 transition hover:shadow-md ${dense ? 'p-3' : 'p-4'}`}>
+      {leading}
+      {r.progress !== null
+        ? <MiniRing value={r.progress} />
+        : <span className="grid h-[54px] w-[54px] shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600"><Target size={22} /></span>}
+      <div className="min-w-0 flex-1">
+        <Title r={r} done={done} />
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {r.status && <Pill tone={statusTone(r.status)}>{r.status}</Pill>}
+          {due && <Pill tone={due.overdue ? 'red' : 'green'}><Target size={12} /> Target {due.label}</Pill>}
+        </div>
+        {related && <RelatedChips items={related} />}
+      </div>
+      <Actions r={r} onEdit={onEdit} />
+    </li>
+  );
+}
+
+/** LEARNING: a book-cover tile, then the course name, hours/pages and a progress bar. */
+function LearningCard({ r, leading, dense, onEdit, related }: RowProps) {
+  const done = isDone(r);
+  const due = r.due ? formatDue(r.due, done) : null;
+  return (
+    <li className={`flex items-start gap-3.5 rounded-xl border border-sky-100 bg-white transition hover:shadow-sm ${dense ? 'p-3' : 'p-3.5'}`}>
+      {leading}
+      <span className="grid h-[72px] w-[54px] shrink-0 place-items-center rounded-lg bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm"><BookOpen size={22} /></span>
+      <div className="min-w-0 flex-1">
+        <Title r={r} done={done} />
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {r.status && <Pill tone={statusTone(r.status)}>{r.status}</Pill>}
+          {r.amount !== null && <Pill tone="blue"><Hourglass size={12} /> {r.amount}</Pill>}
+          {due && <Pill tone={due.overdue ? 'red' : 'slate'}><Calendar size={12} /> {due.label}</Pill>}
+        </div>
+        {r.progress !== null && (
+          <div className="mt-2.5 flex items-center gap-2">
+            <div className="flex-1"><Bar value={r.progress} track="bg-sky-100" fill="bg-sky-500" height="h-1.5" /></div>
+            <span className="w-9 text-right text-xs tabular-nums text-sky-700">{Math.round(r.progress)}%</span>
+          </div>
+        )}
+        {related && <RelatedChips items={related} />}
+      </div>
+      <Actions r={r} onEdit={onEdit} />
+    </li>
+  );
+}
+
+/** HABITS / LOGS (Spiritual…): a calendar tile for the day, a big number for the amount, a tick when done. */
+function HabitCard({ r, leading, dense, onEdit, related }: RowProps) {
+  const done = isDone(r);
+  const when = dayParts(r.due ?? r.created);
+  return (
+    <li className={`flex items-center gap-3 rounded-2xl border border-teal-100 bg-white transition hover:shadow-sm ${dense ? 'p-2.5' : 'p-3'}`}>
+      <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-teal-500 to-emerald-600 text-white shadow-sm" aria-label={`${when.month} ${when.day}`}>
+        <span className="text-[10px] font-semibold uppercase leading-none tracking-wide opacity-90">{when.month}</span>
+        <span className="text-xl font-bold leading-tight tabular-nums">{when.day}</span>
+      </div>
+      {leading}
+      <div className="min-w-0 flex-1">
+        <Title r={r} done={done} />
+        {r.status && <div className="mt-1"><Pill tone={statusTone(r.status)}>{r.status}</Pill></div>}
+        {related && <RelatedChips items={related} />}
+      </div>
+      {r.amount !== null && <p className="shrink-0 px-1 text-2xl font-bold leading-none tabular-nums text-teal-700">{r.amount}</p>}
+      {done && <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600" aria-label="Done"><Check size={14} /></span>}
+      <Actions r={r} onEdit={onEdit} />
+    </li>
+  );
+}
+
+/** NOTES / IDEAS / JOURNAL: a sticky-note card that shows the beginning of the text. */
+function NoteCard({ r, leading, onEdit, related }: RowProps) {
+  const done = isDone(r);
+  const when = r.due ?? r.created;
+  const { month, day } = dayParts(when);
+  return (
+    <li className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 transition hover:shadow-md">
+      <div className="flex items-start gap-2">
+        {leading}
+        <StickyNote size={16} className="mt-1 shrink-0 text-amber-500" />
+        <p className={`line-clamp-2 min-w-0 flex-1 font-semibold ${done ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{r.title}</p>
+        <Actions r={r} onEdit={onEdit} />
+      </div>
+      {r.notes && <p className="mt-2 line-clamp-3 whitespace-pre-line text-sm text-slate-600">{r.notes}</p>}
+      <div className="mt-3 flex items-center justify-between gap-2 text-xs text-amber-800/80">
+        <span>{month} {day}</span>
+        {r.status && <Pill tone={statusTone(r.status)}>{r.status}</Pill>}
+      </div>
+      {related && <RelatedChips items={related} />}
+    </li>
+  );
+}
+
+/** Anything else: a clean, simple card. */
+function StandardCard({ r, leading, dense, onEdit, related }: RowProps) {
+  const done = isDone(r);
+  const due = r.due ? formatDue(r.due, done) : null;
+  return (
+    <li className={`flex items-start gap-3 rounded-xl border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm ${dense ? 'p-3' : 'p-4'}`}>
+      {leading}
+      <div className="min-w-0 flex-1">
+        <Title r={r} done={done} />
+        {(r.status || r.priority || due || r.amount !== null) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {r.status && <Pill tone={statusTone(r.status)}>{r.status}</Pill>}
+            {r.priority && <Pill tone={priorityTone(r.priority)}>{r.priority}</Pill>}
+            {due && <Pill tone={due.overdue ? 'red' : due.today ? 'amber' : 'slate'}><Calendar size={12} /> {due.label}</Pill>}
+            {r.amount !== null && <Pill tone="violet">{r.amount}</Pill>}
+          </div>
+        )}
+        {related && <RelatedChips items={related} />}
+      </div>
+      <Actions r={r} onEdit={onEdit} />
+    </li>
+  );
+}
+
+/** One record, drawn with the card that belongs to its table. */
+export function RecordRow(props: RowProps) {
+  switch (props.variant) {
+    case 'task': return <TaskCard {...props} />;
+    case 'project': return <ProjectCard {...props} />;
+    case 'goal': return <GoalCard {...props} />;
+    case 'learning': return <LearningCard {...props} />;
+    case 'habit': return <HabitCard {...props} />;
+    case 'note': return <NoteCard {...props} />;
+    default: return <StandardCard {...props} />;
+  }
 }
 
 export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {

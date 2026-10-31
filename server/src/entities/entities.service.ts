@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import { NotionService } from '../notion/notion.service';
 import { SyncService } from '../sync/sync.service';
 import { CollectionsService } from './collections.service';
-import { FieldMap, Kind, MappingError, NfRecord, buildProperties, detectFields, inferStyle, pageToRecord } from './mapping';
+import { FieldMap, Kind, MappingError, NfRecord, buildProperties, detectFields, pageToRecord } from './mapping';
 import { CreateRecordDto, ListQueryDto, UpdateRecordDto } from './dto';
 
 @Injectable()
@@ -49,7 +49,7 @@ export class EntitiesService {
       label: this.collections.get(kind)?.label ?? kind,
       title: src.title,
       fields,
-      style: inferStyle(kind, this.collections.get(kind)?.label ?? kind, fields),
+      style: this.collections.styleFor(kind, fields),
       options: { status: options(fields.status), priority: options(fields.priority) },
     };
   }
@@ -110,7 +110,7 @@ export class EntitiesService {
       items: res.results.map((p: any) => pageToRecord(p, fields)) as NfRecord[],
       hasMore: !!res.has_more,
       nextCursor: (res.has_more ? res.next_cursor : null) as string | null,
-      style: inferStyle(kind, this.collections.get(kind)?.label ?? kind, fields),
+      style: this.collections.styleFor(kind, fields),
     };
   }
 

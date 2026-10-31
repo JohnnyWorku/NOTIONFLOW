@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
  * This only checks the cookie is present (cheap, edge-safe). The BACKEND verifies the signed token on every
  * API call, so a forged or expired cookie never yields any data.
  */
-const PUBLIC = ['/login', '/download', '/api/auth', '/api/apk-info', '/api/apk-file', '/api/version'];
+// Icons and the manifest must load before sign-in (the login page needs its favicon).
+const PUBLIC = ['/login', '/download', '/api/auth', '/api/apk-info', '/api/apk-file', '/api/version', '/icon.svg', '/apple-icon.png', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

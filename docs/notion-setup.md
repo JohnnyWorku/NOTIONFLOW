@@ -27,4 +27,16 @@
    - **Pin a page that is not linked anywhere**: set `NOTION_PAGES` to a one-line JSON array, for example `[{"id":"<32-character page id>","label":"Spiritual","icon":"moon"}]` (`icon` is optional: check, folder, target, book, sparkles, heart, dumbbell, wallet, moon, sun, star, leaf, brain). Share the page with the integration first. Pinned pages come first.
    - Tables found on a page are registered automatically and get the same card design and editing as every other table. Sub-pages open inside the app, so you can go as deep as your Notion goes.
    - Limits: a page needs to be shared with the integration (page → `···` → Connections); very long pages show their first part; images and embeds are not shown.
-   - **Cards:** every record uses the same rounded card (the Goals look). The colour and icon say which table it is: tasks indigo, projects violet, goals green, learning blue, logs such as Spiritual teal with a date badge, other tables slate. An overdue task turns rose and a finished one turns green.
+   - **Cards: every kind of table has its own design.**
+
+     | Table | Card |
+     |---|---|
+     | Tasks | colour stripe for urgency (red overdue/high, amber, green done), checkbox in front, the due date as a badge on the right |
+     | Projects | gradient header with name and status, then deadline and a thick progress bar |
+     | Goals | progress ring (or a target icon) on a soft green card |
+     | Learning | book-cover tile, hours/pages, progress bar |
+     | Spiritual and other logs (habits, health, workouts…) | calendar tile for the day, big number for the amount, a tick when done |
+     | Notes, ideas, journal | sticky-note card with a preview of the text |
+     | Anything else | clean, simple card |
+
+     The design is chosen from the table's **name** (tasks, projects, goals, learning/course/book, spiritual/prayer/habit/health…, notes/ideas/journal) and, if the name does not tell, from its **properties** (a checkbox and a date → task, a progress number → project or goal, a number and date → log, text only → note). To choose it yourself, set `NOTION_CARD_STYLES={"spiritual":"habit","reading":"learning"}`, or add `"card":"project"` to a table in `NOTION_COLLECTIONS`. Allowed: task, project, goal, learning, habit, note, standard. This works for tables found automatically on your Notion pages too.

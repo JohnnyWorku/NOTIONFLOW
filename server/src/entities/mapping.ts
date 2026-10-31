@@ -107,18 +107,22 @@ export function buildProperties(f: FieldMap, schema: Record<string, any>, input:
 export class MappingError extends Error {}
 
 
-/** Which card design a table gets. Decided from its name first, then from the shape of its properties. */
-export type CardStyle = 'task' | 'project' | 'goal' | 'learning' | 'habit' | 'standard';
+/** The card designs. Each kind of table has its own layout (see the web and mobile apps). */
+export const CARD_STYLES = ['task', 'project', 'goal', 'learning', 'habit', 'note', 'standard'] as const;
+export type CardStyle = (typeof CARD_STYLES)[number];
 
+/** Which card design a table gets: decided from its name first, then from the shape of its properties. */
 export function inferStyle(key: string, label: string, f: FieldMap): CardStyle {
   const t = `${key} ${label}`.toLowerCase();
   if (/task|to-?do|chore/.test(t)) return 'task';
   if (/project/.test(t)) return 'project';
   if (/goal|objective|okr/.test(t)) return 'goal';
   if (/learn|course|study|read|book|skill/.test(t)) return 'learning';
-  if (/spirit|pray|quran|dhikr|worship|habit|journal|gratitude|health|workout|exercise|fitness|sleep|mood|fast/.test(t)) return 'habit';
+  if (/spirit|pray|quran|dhikr|worship|habit|health|workout|exercise|fitness|sleep|mood|fast/.test(t)) return 'habit';
+  if (/note|idea|journal|diary|memo|quote|reflection|gratitude/.test(t)) return 'note';
   if (f.done && f.due) return 'task';
   if (f.progress) return f.status ? 'project' : 'goal';
   if (f.amount || (f.due && !f.status)) return 'habit';
+  if (f.notes && !f.status) return 'note';
   return 'standard';
 }

@@ -21,4 +21,16 @@ describe('CollectionsService', () => {
     expect(() => new CollectionsService(cfg({ NOTION_COLLECTIONS: '[{"key":"tasks","label":"x","databaseId":"d"}]' }))).toThrow(/already used/);
     expect(() => new CollectionsService(cfg({ NOTION_COLLECTIONS: '[{"key":"a","label":"x","databaseId":"d","fields":{"bogus":"X"}}]' }))).toThrow(/not a valid mapping/);
   });
+  it('lets you force a card design for any table', () => {
+    const s = new CollectionsService(cfg({ NOTION_COLLECTIONS: '[{"key":"reading","label":"Reading","databaseId":"d","card":"project"}]', NOTION_CARD_STYLES: '{"spiritual":"habit","tasks":"goal"}' }));
+    expect(s.styleFor('reading', {})).toBe('project'); // per-table setting beats the name
+    expect(s.styleFor('tasks', {})).toBe('goal'); // NOTION_CARD_STYLES beats everything
+    expect(s.styleFor('spiritual', {})).toBe('habit'); // works for tables that are not configured yet
+    expect(s.styleFor('projects', {})).toBe('project'); // otherwise inferred
+  });
+  it('rejects unknown card designs', () => {
+    expect(() => new CollectionsService(cfg({ NOTION_CARD_STYLES: '{"x":"fancy"}' }))).toThrow(/must be one of/);
+    expect(() => new CollectionsService(cfg({ NOTION_CARD_STYLES: '[1]' }))).toThrow(/JSON object/);
+    expect(() => new CollectionsService(cfg({ NOTION_COLLECTIONS: '[{"key":"a","label":"A","databaseId":"d","card":"fancy"}]' }))).toThrow(/card must be one of/);
+  });
 });

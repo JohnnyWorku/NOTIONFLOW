@@ -4,7 +4,7 @@ export interface NfRecord {
   relatedIds: string[]; notes: string | null; created: string; lastEdited: string; unsupported: string[];
 }
 export interface Page<T> { items: T[]; nextCursor: string | null; mapping?: Record<string, string | undefined> }
-export type CardStyle = 'task' | 'project' | 'goal' | 'learning' | 'habit' | 'standard';
+export type CardStyle = 'task' | 'project' | 'goal' | 'learning' | 'habit' | 'note' | 'standard';
 export interface Collection { key: string; label: string; icon?: string; builtin: boolean; description?: string; configured: boolean; discovered?: boolean }
 export interface Meta {
   key: string; label: string; style?: CardStyle; fields: Record<string, string | undefined>;

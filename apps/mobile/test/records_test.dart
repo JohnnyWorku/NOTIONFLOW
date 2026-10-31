@@ -40,6 +40,7 @@ void cardStyleTests() {
   test('maps the server style name to a card design', () {
     expect(cardStyleFrom('task'), CardStyle.task);
     expect(cardStyleFrom('habit'), CardStyle.habit);
+    expect(cardStyleFrom('note'), CardStyle.note);
     expect(cardStyleFrom('nonsense'), CardStyle.standard);
     expect(cardStyleFrom(null), CardStyle.standard);
   });

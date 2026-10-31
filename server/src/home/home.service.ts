@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CollectionsService } from '../entities/collections.service';
 import { EntitiesService } from '../entities/entities.service';
-import { CardStyle, NfRecord, inferStyle } from '../entities/mapping';
+import { CardStyle, NfRecord } from '../entities/mapping';
 import { NotionService } from '../notion/notion.service';
 import { SyncService } from '../sync/sync.service';
 import { lastNDays } from '../stats/stats.util';
@@ -292,7 +292,7 @@ export class HomeService {
     try {
       const r = await this.entities.list(key, { pageSize: 10, ...presetFilters(preset, ctx.today) });
       b.items = r.items; b.hasMore = !!r.nextCursor;
-      b.style = inferStyle(key, this.collections.get(key)?.label ?? key, r.mapping);
+      b.style = this.collections.styleFor(key, r.mapping);
     } catch (e: any) {
       b.error = e?.response?.message ?? 'Could not load this table.';
       b.items = [];
@@ -336,7 +336,7 @@ export class HomeService {
           const r = await this.entities.list(c.key, { pageSize: 6 });
           const home = this.homeId;
           const pg = await this.pageOfCollection(c.key, new Set(home ? [norm(home)] : []));
-          return { ...base, style: inferStyle(c.key, c.label, r.mapping), items: r.items.slice(0, 5), hasMore: r.items.length > 5 || !!r.nextCursor, pageId: pg?.id, pageTitle: pg?.title };
+          return { ...base, style: this.collections.styleFor(c.key, r.mapping), items: r.items.slice(0, 5), hasMore: r.items.length > 5 || !!r.nextCursor, pageId: pg?.id, pageTitle: pg?.title };
         } catch (e: any) {
           this.log.warn(`Home: could not load "${c.key}"`);
           return { ...base, style: 'standard', items: [], hasMore: false, error: e?.response?.message ?? 'Could not load this table.' };

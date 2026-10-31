@@ -68,6 +68,8 @@ describe('card style', () => {
     expect(inferStyle('goals', 'Goals', {})).toBe('goal');
     expect(inferStyle('learning', 'Learning', {})).toBe('learning');
     expect(inferStyle('spiritual', 'Spiritual', {})).toBe('habit');
+    expect(inferStyle('journal', 'Journal', {})).toBe('note');
+    expect(inferStyle('ideas', 'Ideas', {})).toBe('note');
   });
   it('falls back to the shape of the properties', () => {
     expect(inferStyle('x', 'Chores list', { done: 'Done', due: 'Due' })).toBe('task');
@@ -75,5 +77,6 @@ describe('card style', () => {
     expect(inferStyle('x', 'Stuff', { progress: 'P' })).toBe('goal');
     expect(inferStyle('x', 'Stuff', { amount: 'Pages' })).toBe('habit');
     expect(inferStyle('x', 'Stuff', {})).toBe('standard');
+    expect(inferStyle('x', 'Stuff', { notes: 'Notes' })).toBe('note');
   });
 });
